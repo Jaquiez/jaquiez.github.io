@@ -1,0 +1,61 @@
+body {
+  
+  background-color:rgb(47, 53, 66);
+  opacity: .7;
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: 100;
+  text-align: center;
+  color: white
+}
+a{
+  text-decoration: none;
+  color: whitesmoke
+}
+h1
+{
+  padding-bottom:  5px;
+}
+
+ul li
+{
+  display: inline-flex;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+ul
+{
+  list-style-type: none;
+}
+#projects
+{
+  font-size: large;
+}
+p{
+  font-size: large;
+}
+#project
+{
+  opacity: 1;
+  color: black;
+  outline-style: solid;
+  outline: 5px black;
+  background-color: rgb(116, 125, 140);
+}
+div
+{
+  width: auto;
+  background-color: rgb(87, 96, 111);
+  padding: 15px;
+  margin: 15px;
+  opacity: .5;
+  color: black;
+  outline: 5px black;
+  outline-style: solid;
+  list-style-type: none;
+
+  
+}
+div li
+{
+  margin-bottom: 15px;
+}
