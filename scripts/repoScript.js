@@ -13,7 +13,6 @@ async function getRepos()
   return repos;
 }
 //BAD CODE BAD CODE BAD CODE BAD CODE BAD CODE BAD CODE
-//
 async function doGeneral()
 {
   (await getRepos()).forEach((val,key) =>
