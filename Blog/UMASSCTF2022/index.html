@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<link rel="stylesheet" href="../../resources/styles/dopestyle.css">
+
+<head>
+    <title>Jaquiez</title>
+</head>
+
+<body>
+    <header>
+        <nav class="navbar-all">
+            <ul>
+                <li><a href="/">Jaquiez</a></li>
+                <li><a href="/Blog/">Blog</a></li>
+                <li><a href="/Projects/">Projects</a></li>
+                <li><a href="/Contact/">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+    <h1>
+        UMASS CTF 2022 - April 2022
+    </h1>
+
+    <div id="post" style="display:table-cell; vertical-align:middle; text-align:center">
+        <p>
+            UMASS CTF was this past weekend and I authored three web challenges: <a id=AutoFlag
+                href="#AutoFlag">AutoFlag</a>, Venting, and umassdining.
+        </p>
+        <div id=AutoFlag>
+            <h1 class="head">
+                Autoflag
+            </h1>
+            <div>
+                <p>
+                    This challenge was based off a challenge that Akamai created for UMASS CTF. Originally, it was a jwt
+                    token manipulation challenge that hinted at the secret token being "super-secret."
+                    While this was an okay idea for a challenge, I decided to expand on the idea with some very basic
+                    git foresnics and code review.
+                    At the end of the competition it had 184 solves so I may have made it slightly easier than
+                    anticipated. Below is my "official" writeup of the challenge.
+
+                </p>
+
+            </div>
+            <img src="images/challenge1.png">
+            <div>
+                <p>
+                    Upon opening the website we're greeted with the AutoFlag site giving us two buttons, one to get a
+                    free flag and another to see the AutoFlag API.
+                </p>
+            </div>
+            <img src="images/challenge1site.png" height="60%" width="60%">
+            <div>
+                <p>
+                    Since everybody wants a free flag, let's just click that and get one!
+                    This ends up with us getting redirected, and the site also makes some requests which we will inspect
+                    later.
+                </p>
+            </div>
+            <img src="images/challenge1redir.png" height="80%" width="80%">
+            <div>
+                <p>
+                    After a few seconds, we are redirected to a page with a flag we don't want. A few more requests are
+                    made so let's start looking at them. Also note, the file name is anonuserflag.png, this may hint that there are other user flags to collect.
+                </p>
+            </div>
+            <img src="images/dumbflag.png" height="70%" width="70%">
+            <div>
+                <p>
+                    This first GET request we see is on /login where we see that a cookie is set.
+                    This looks a lot like a JWT cookie, we can tell by the base64 "ey" which in ascii is "{"" aswell as
+                    the three parts being seperated by dots.
+                    So we know a JWT authentication is sent, this can be a possible vector of attack if we want to login
+                    as another user.
+                    Possible attacks you may be thinking of are a weak JWT secret or misconfiguration server side.
+
+                </p>
+            </div>
+            <img src="images/request1.png" height="70%" width="70%">
+            <div>
+                <p>
+                    Also in the request above we can see a javascript file is loaded called api.js.
+                    We can open it up and see that in the source a comment is telling us that there is an 'admin' user and we can see the 
+                    API source code changes on git. Interesting, let's check it out.
+                </p>
+            </div>
+            <img src="images/scriptv2.png">
+            <div>
+                <p>
+                    If we click the checkout the Autoflag API button on the main page we get a repository and see 4 commits.
+                    One commit looks kind of interesting, let's click that. 
+                </p>
+            </div>
+            <img src="images/commits.png">
+            <div>
+                <p>
+                    Checking out that commit we see a simple js script that created an unsigned token and signs it.
+                    Tokens are signed by sending them in a post request to an "/api/sign-hmac" endpoint.
+                </p>
+            </div>
+        </div>
+        <div id="Venting">
+
+        </div>
+        <div id="umassdining">
+
+        </div>
+    </div>
+    
+
+</body>
