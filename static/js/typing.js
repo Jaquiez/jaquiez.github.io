@@ -27,7 +27,7 @@ const asyncExec = async ()=>{
         let sleepTime = calcSleepTime(text.length);
         while(++counter<text.length){
             obj.innerHTML += text[counter];
-            await sleep(sleepTime/(2*text.length))
+            await sleep(10)
         }
         obj.innerHTML = text;
         info.append(document.createElement('br'))
