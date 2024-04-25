@@ -1,0 +1,136 @@
+body {
+    background-image: url('background.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    color: white;
+    font-family: 'Space Mono';
+
+    grid-template-columns: auto;
+    display: grid;
+    justify-items: center;
+}
+
+.navbar {
+    background-color: rgba(1, 0, 65, 0.65);
+    width: 100%;
+    padding: 5px;
+    font-size: x-large;
+    border: 2.5px solid #08090A;
+    border-radius: 10px;
+}
+
+.navbar ul {
+    list-style-type: none;
+    margin: 0px;
+    padding: 0px;
+}
+
+.navbar li {
+    display: inline;
+}
+
+a:link {
+    color: white;
+    text-decoration: none;
+}
+
+a:visited {
+    color: rgb(211, 211, 211);
+    text-decoration: none;
+}
+
+.profile-picture {
+    animation: fadeInAnimation ease 3s;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+
+    border: 2.5px solid #08090A;
+    border-radius: 50%;
+    min-width: 100px;
+    max-width: 300px;
+    width: 100%;
+    height: auto;
+    background-size: contains;
+}
+
+.container {
+    border: 2.5px solid #08090A;
+    color: whitesmoke;
+    background-color: rgba(1, 0, 65, 0.65);
+    width: 80%;
+    display: grid;
+    justify-items: center;
+    gap: 15px;
+    border-radius: 15px;
+    padding: 10px;
+}
+
+.welcome-container {
+    gap: 15px;
+    min-width: 300px;
+    min-height: 300px;
+
+    width: 80%;
+    display: flex;
+    grid-template-columns: 70% 30%;
+    justify-items: center;
+
+    padding: 15px;
+}
+
+@keyframes fadeInAnimation {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.transparent {
+    opacity: 0;
+    width: 100%;
+}
+
+
+.panel {
+    animation: fadeInAnimation ease 3s;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+    width: 100%;
+    border-radius: 15px;
+    background-color: #33808dc7;
+    border: 2.5px solid #222823;
+    color: whitesmoke;
+    padding: 0px 10px 5px 10px;
+}
+
+.panel ul {
+    list-style-type: '> ';
+}
+
+.blog-container {
+    border: 2.5px solid #08090A;
+    color: #222823;
+    background-color: rgba(1, 0, 65, 0.65);
+    width: 80%;
+    gap: 15px;
+    border-radius: 15px;
+    padding: 10px;
+}
+
+.blog-panel {
+    width: 80%;
+    border-radius: 15px;
+    background-color: #33808dc7;
+    border: 2.5px solid #222823;
+    color: whitesmoke;
+    padding: 0px 10px 5px 10px;
+    margin: 0 auto;
+}
+
+.blog-panel ul {
+    list-style-type: '> ';
+}
