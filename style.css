@@ -31,13 +31,15 @@ body {
 }
 
 a:link {
-    color: white;
+    color: #9490b5;
     text-decoration: none;
+    font-weight: bolder;
 }
 
 a:visited {
-    color: rgb(211, 211, 211);
+    color: #484659;
     text-decoration: none;
+    font-weight: bold;
 }
 
 .profile-picture {
