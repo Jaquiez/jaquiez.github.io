@@ -11,6 +11,10 @@ body {
     justify-items: center;
 }
 
+pre{
+    white-space: pre-wrap;
+    width: 80%;
+}
 .navbar {
     background-color: rgba(1, 0, 65, 0.65);
     width: 100%;

