@@ -4,7 +4,7 @@ body {
     background-size: cover;
     background-attachment: fixed;
     color: white;
-    font-family: 'Space Mono';
+    font-family: 'Geist Mono';
 
     grid-template-columns: auto;
     display: grid;
@@ -13,12 +13,12 @@ body {
 
 pre{
     white-space: pre-wrap;
-    width: 80%;
+    width: 65%;
 }
 .navbar {
     background-color: rgba(1, 0, 65, 0.65);
     width: 100%;
-    padding: 5px;
+    padding: 5px 5px 5px 5px;
     font-size: x-large;
     border: 2.5px solid #08090A;
     border-radius: 10px;
@@ -128,15 +128,33 @@ a:visited {
 }
 
 .blog-panel {
-    width: 80%;
+    width: 70%;
     border-radius: 15px;
     background-color: #33808dc7;
     border: 2.5px solid #222823;
     color: whitesmoke;
-    padding: 0px 10px 5px 10px;
-    margin: 0 auto;
+    padding: 5px 10px 5px 10px;
 }
 
 .blog-panel ul {
     list-style-type: '> ';
+}
+
+.blog-image{
+    width: 60%;
+}
+
+code {
+    font-size: larger;
+    margin: 0px;
+}
+
+.inline_code {
+    background-color: rgb(146, 103, 109,.75);
+    font-size: large;
+    font-weight: bold;
+}
+
+pre{
+    margin: 0px;
 }
