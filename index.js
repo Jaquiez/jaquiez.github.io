@@ -4,7 +4,7 @@ const LoadingHelper = {
                     root@localhost: ~$ whoami
                 </p>
                 <ul>
-                    <li>An Offensive Security engineer with an interest in web + low level security.
+                    <li>An offensive security engineer with an interest in web + low level security.
                     </li>
                     <li>
                         Learning web application security through CTFs.
