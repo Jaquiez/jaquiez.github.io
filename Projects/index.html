@@ -16,7 +16,220 @@
             <li><a href="/Contact">Contact</a></li>
         </ul>
     </div>
-    <div>
-        Under Construction!
+
+    <h1>
+        My Projects
+    </h1>
+
+    <div class="container">
+        <div class="blog-panel">
+            Here are some of the projects I've been working on. Most of these are open source and available on my <a href="https://github.com/jaquiez" target="_blank">GitHub</a>!
+        </div>
+
+        <div id="loading" style="text-align: center; margin: 40px 0;">
+            <p>Loading projects from the Krusty Krab...</p>
+        </div>
+
+        <div id="projects-container" style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 30px;"></div>
+
+        <div id="error-message" style="display: none; text-align: center; margin: 40px 0;">
+            <p>Oh barnacles! Couldn't load the projects. Maybe try again later?</p>
+        </div>
     </div>
+
+    <script>
+        const repoNames = [
+            'my-ctf-challenges',
+            'what-the-shell',
+            'FiveM-Client-Hacking'
+        ];
+
+        const username = 'jaquiez';
+
+        async function fetchGitHubRepos() {
+            const projectsContainer = document.getElementById('projects-container');
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error-message');
+
+            try {
+                // Fetch all repos in parallel
+                const repoPromises = repoNames.map(repoName => 
+                    fetch(`https://api.github.com/repos/${username}/${repoName}`)
+                        .then(res => {
+                            if (!res.ok) throw new Error(`Failed to fetch ${repoName}`);
+                            return res.json();
+                        })
+                );
+
+                const repos = await Promise.all(repoPromises);
+
+                // Hide loading message
+                loadingDiv.style.display = 'none';
+
+                // Create project cards using safe DOM manipulation
+                repos.forEach(repo => {
+                    const projectCard = createProjectCard(repo);
+                    projectsContainer.appendChild(projectCard);
+                });
+
+            } catch (error) {
+                console.error('Error fetching repos:', error);
+                loadingDiv.style.display = 'none';
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function createProjectCard(repo) {
+            const description = repo.description || 'No description available';
+            const language = repo.language || 'Unknown';
+            const stars = repo.stargazers_count;
+            const forks = repo.forks_count;
+            const updatedDate = new Date(repo.updated_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            const languageColors = {
+                'Python': '#3572A5',
+                'JavaScript': '#f1e05a',
+                'TypeScript': '#2b7489',
+                'HTML': '#e34c26',
+                'CSS': '#563d7c',
+                'Go': '#00ADD8',
+                'Rust': '#dea584',
+                'C': '#555555',
+                'C++': '#f34b7d',
+                'Java': '#b07219',
+                'Shell': '#89e051',
+                'Ruby': '#701516',
+                'PHP': '#4F5D95',
+                'Scala': '#c22d40'
+            };
+
+            const languageColor = languageColors[language] || '#858585';
+
+            // Create card container
+            const card = document.createElement('div');
+            card.className = 'blog-panel';
+            card.style.flex = '1 1 calc(33.333% - 20px)';
+            card.style.minWidth = '280px';
+            card.style.maxWidth = 'calc(50% - 15px)';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.boxSizing = 'border-box';
+
+            // Create title heading with link
+            const title = document.createElement('h3');
+            title.style.marginTop = '0';
+            title.style.marginBottom = '8px';
+            title.style.fontSize = '1.1em';
+            const titleLink = document.createElement('a');
+            titleLink.href = repo.html_url;
+            titleLink.target = '_blank';
+            titleLink.style.textDecoration = 'none';
+            titleLink.style.color = 'inherit';
+            titleLink.textContent = repo.name;
+            title.appendChild(titleLink);
+            card.appendChild(title);
+
+            // Add description
+            const descPara = document.createElement('p');
+            descPara.style.marginBottom = '12px';
+            descPara.style.fontSize = '0.9em';
+            descPara.style.lineHeight = '1.4';
+            descPara.style.flex = '1';
+            descPara.textContent = description;
+            card.appendChild(descPara);
+
+            // Create metadata container
+            const metaContainer = document.createElement('div');
+            metaContainer.style.display = 'flex';
+            metaContainer.style.gap = '12px';
+            metaContainer.style.flexWrap = 'wrap';
+            metaContainer.style.alignItems = 'center';
+            metaContainer.style.fontSize = '0.8em';
+            metaContainer.style.opacity = '0.8';
+            metaContainer.style.marginBottom = '10px';
+
+            // Add language with color dot
+            const langSpan = document.createElement('span');
+            langSpan.style.display = 'flex';
+            langSpan.style.alignItems = 'center';
+            langSpan.style.gap = '4px';
+            
+            const colorDot = document.createElement('span');
+            colorDot.style.width = '8px';
+            colorDot.style.height = '8px';
+            colorDot.style.borderRadius = '50%';
+            colorDot.style.backgroundColor = languageColor;
+            
+            langSpan.appendChild(colorDot);
+            langSpan.appendChild(document.createTextNode(language));
+            metaContainer.appendChild(langSpan);
+
+            if (stars > 0) {
+                const starsSpan = document.createElement('span');
+                starsSpan.textContent = `Stars: ${stars}`;
+                metaContainer.appendChild(starsSpan);
+            }
+
+            if (forks > 0) {
+                const forksSpan = document.createElement('span');
+                forksSpan.textContent = `Forks: ${forks}`;
+                metaContainer.appendChild(forksSpan);
+            }
+
+            card.appendChild(metaContainer);
+
+            const dateSpan = document.createElement('div');
+            dateSpan.style.fontSize = '0.8em';
+            dateSpan.style.opacity = '0.7';
+            dateSpan.style.marginBottom = '10px';
+            dateSpan.textContent = `Updated ${updatedDate}`;
+            card.appendChild(dateSpan);
+
+            if (repo.topics && repo.topics.length > 0) {
+                const topicsContainer = document.createElement('div');
+                topicsContainer.style.display = 'flex';
+                topicsContainer.style.gap = '5px';
+                topicsContainer.style.flexWrap = 'wrap';
+                topicsContainer.style.marginBottom = '10px';
+
+                repo.topics.forEach(topic => {
+                    const topicSpan = document.createElement('span');
+                    topicSpan.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                    topicSpan.style.padding = '2px 5px';
+                    topicSpan.style.borderRadius = '3px';
+                    topicSpan.style.fontSize = '0.7em';
+                    topicSpan.textContent = topic;
+                    topicsContainer.appendChild(topicSpan);
+                });
+
+                card.appendChild(topicsContainer);
+            }
+
+            // Add GitHub link button
+            const githubLink = document.createElement('a');
+            githubLink.href = repo.html_url;
+            githubLink.target = '_blank';
+            githubLink.style.textDecoration = 'none';
+            githubLink.style.color = 'rgb(215, 151, 160)'
+            githubLink.style.padding = '5px 10px';
+            githubLink.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            githubLink.style.borderRadius = '4px';
+            githubLink.style.display = 'inline-block';
+            githubLink.style.fontSize = '0.85em';
+            githubLink.style.marginTop = 'auto';
+            githubLink.textContent = 'View on GitHub';
+            
+            card.appendChild(githubLink);
+
+            return card;
+        }
+
+        // Fetch repos when page loads
+        fetchGitHubRepos();
+    </script>
 </body>
+</html>
