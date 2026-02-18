@@ -247,3 +247,86 @@ code {
 pre{
     margin: 0px;
 }
+
+/* Typing Speed Control - positioned in top right */
+.typing-speed-control {
+    position: fixed;
+    top: 80px; /* Below navbar */
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    background-color: rgba(51, 128, 141, 0.9);
+    padding: 15px 20px;
+    border-radius: 10px;
+    border: 2px solid #222823;
+    z-index: 100;
+}
+
+.typing-speed-control label {
+    color: whitesmoke;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+#typing-speed {
+    width: 150px;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 5px;
+    outline: none;
+    cursor: pointer;
+    direction: rtl;
+}
+
+#typing-speed::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: whitesmoke;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#typing-speed::-webkit-slider-thumb:hover {
+    background: #ffffff;
+    transform: scale(1.2);
+}
+
+#typing-speed::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: whitesmoke;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#typing-speed::-moz-range-thumb:hover {
+    background: #ffffff;
+    transform: scale(1.2);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .typing-speed-control {
+        top: auto;
+        bottom: 20px;
+        right: 20px;
+        left: 20px;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    #typing-speed {
+        width: 120px;
+    }
+}

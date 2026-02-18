@@ -39,10 +39,11 @@ function sleep(ms) {
     return new Promise((res) => setTimeout(res, ms));
 }
 
-async function typeText(ELEM,content, delay, keepCursor) {
+async function typeText(ELEM,content, keepCursor) {
     return new Promise(async (res) => {
         for (let i = 0; i < content.length; ++i) {
-            await sleep(delay)
+            const typing_speed = parseInt(document.getElementById('typing-speed').value);
+            await sleep(typing_speed)
             ELEM.innerHTML = content.substring(0, i) + `<span class="typing-cursor">&nbsp;</span> `;
         }
         if(!keepCursor){
@@ -62,7 +63,7 @@ async function loadIndex() {
         ELEM.classList.replace('transparent', 'transition');
         await sleep(100);
         ELEM.classList.replace('transition', 'panel');
-        await typeText(ELEM,LoadingHelper[key],10,true);
+        await typeText(ELEM,LoadingHelper[key],true);
     }
 
 }
