@@ -97,6 +97,7 @@ a:visited {
     width: 100%;
     height: auto;
     background-size: contains;
+    object-fit: contain;
 }
 
 .container {
