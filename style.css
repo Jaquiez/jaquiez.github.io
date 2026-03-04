@@ -95,9 +95,9 @@ a:visited {
     min-width: 100px;
     max-width: 300px;
     width: 100%;
+    aspect-ratio: 1 / 1;
     height: auto;
     background-size: contains;
-    object-fit: contain;
 }
 
 .container {
